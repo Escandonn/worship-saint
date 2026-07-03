@@ -1,11 +1,24 @@
 ---
-import "../styles/global.css";
+import Layout from "../layouts/Layout.astro";
+import ScratchReveal from "../components/ScratchReveal";
+import TypewriterText from "../components/TypewriterText";
+
+import doctorDoom from "../assets/doctor-doom.jpg";
+import tony from "../assets/tony.jpg";
+
+const marketingCopy = "¿Sabías que el mismo actor de Iron Man interpretará al temible Doctor Doom? Toca toda la imagen y descubre quién es... Dos polos opuestos: El héroe que salvó al universo frente al villano que buscará conquistarlo.";
 ---
 
-<html lang="es">
-  <body>
-    <h1 class="text-4xl font-bold text-center mt-20">
-      Worship
-    </h1>
-  </body>
-</html>
+<Layout>
+  <main class="fixed inset-0">
+    {/* Efecto Scratch Premium con Partículas Físicas y Cambio de Tema */}
+    <ScratchReveal 
+      client:load 
+      foreground={doctorDoom.src} 
+      background={tony.src}
+      brushSize={140}
+    />
+
+    <TypewriterText client:load text={marketingCopy} speed={38} readDelay={7000} />
+  </main>
+</Layout>

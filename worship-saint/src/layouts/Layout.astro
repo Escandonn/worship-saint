@@ -1,0 +1,28 @@
+---
+import "../styles/global.css";
+---
+
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Iron Man vs Doctor Doom — ¿El mismo hombre?</title>
+    <meta name="description" content="Un mismo actor. Dos destinos opuestos. El héroe que salvó al universo y el villano que busca conquistarlo." />
+
+    <!-- Google Fonts: Cinzel para títulos + Lora para el typewriter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Lora:ital@1&display=swap" rel="stylesheet" />
+
+    <style>
+      /* Reset para prevenir CLS causado por márgenes/scroll del body */
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+      html, body { width: 100%; height: 100%; overflow: hidden; }
+    </style>
+  </head>
+
+  <body>
+    <slot />
+  </body>
+</html>
