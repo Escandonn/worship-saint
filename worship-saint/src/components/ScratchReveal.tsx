@@ -116,6 +116,25 @@ export default function ScratchReveal({
   const scratchProgress = useRef(0);       // 0 = Doom abierto, 1 = Tony
   const isRevealedRef   = useRef(false);
   const [isRevealed, setIsRevealed] = useState(false);
+  const [headerVisible, setHeaderVisible] = useState(false);
+  const [heroTitleVisible, setHeroTitleVisible] = useState(true);
+  const [mobileHeader, setMobileHeader] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => {
+    const updateMobile = () => setMobileHeader(window.innerWidth < 768);
+    updateMobile();
+    window.addEventListener('resize', updateMobile);
+
+    const titleTimeout = window.setTimeout(() => setHeroTitleVisible(false), 1400);
+    const headerTimeout = window.setTimeout(() => setHeaderVisible(true), 1700);
+
+    return () => {
+      window.removeEventListener('resize', updateMobile);
+      window.clearTimeout(titleTimeout);
+      window.clearTimeout(headerTimeout);
+    };
+  }, []);
 
   // Imágenes pre-cargadas — guardadas en ref para acceso desde el loop
   const imgsRef = useRef<{
@@ -301,6 +320,9 @@ export default function ScratchReveal({
   const headerBorder = isRevealed ? 'rgba(212,175,55,0.45)' : 'rgba(80,200,80,0.25)';
   const headerGlow   = isRevealed ? '0 4px 32px rgba(200,0,0,0.35)' : '0 4px 32px rgba(0,100,0,0.3)';
   const titleColor   = isRevealed ? '#D4AF37' : '#88C888';
+  const accentColor  = isRevealed ? '#D4AF37' : '#00ff88';
+  const textColor    = isRevealed ? '#F5E2A0' : '#C7FFCD';
+  const linkColor    = isRevealed ? '#F7E18C' : '#D4FFD6';
   const titleText    = isRevealed ? '⚙ Iron Man — El Vengador de Acero' : '⚗ Doctor Doom — El Monarca del Caos';
 
   return (
@@ -309,25 +331,192 @@ export default function ScratchReveal({
       className="absolute inset-0 w-full h-full overflow-hidden touch-none"
       style={{ touchAction: 'none', background: 'transparent' }}
     >
+      {heroTitleVisible && (
+        <div style={{
+          position: 'absolute', inset: 0, zIndex: 55,
+          display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+          pointerEvents: 'none', paddingTop: '16vw',
+          opacity: heroTitleVisible ? 1 : 0,
+          transition: 'opacity 0.4s ease',
+        }}>
+          <h1 style={{
+            maxWidth: 'min(90vw, 680px)',
+            color: titleColor,
+            fontFamily: "'Cinzel', serif",
+            fontSize: 'clamp(1.15rem, 5vw, 2rem)',
+            lineHeight: 1.05,
+            letterSpacing: '0.22em',
+            textTransform: 'uppercase',
+            textAlign: 'center',
+            background: 'rgba(0,0,0,0.15)',
+            padding: '0.8rem 1rem',
+            borderRadius: '18px',
+            border: `1px solid ${accentColor}`,
+            boxShadow: '0 18px 60px rgba(0,0,0,0.4)',
+          }}>
+            {titleText}
+          </h1>
+        </div>
+      )}
+
       {/* ── HEADER ── */}
       <header style={{
         position: 'absolute', top: 0, left: 0, width: '100%', zIndex: 50,
-        padding: '14px 24px', display: 'flex', justifyContent: 'center', alignItems: 'center',
+        padding: mobileHeader ? '14px 18px' : '12px 20px',
+        display: 'flex', flexDirection: 'column', gap: mobileHeader ? '0.85rem' : '0.75rem',
+        alignItems: 'center',
         backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
         backgroundColor: headerBg,
         borderBottom: `1px solid ${headerBorder}`,
         boxShadow: headerGlow,
-        transition: 'background-color 1.2s ease, box-shadow 1.2s ease, border-color 1.2s ease',
+        transition: 'background-color 1.2s ease, box-shadow 1.2s ease, border-color 1.2s ease, padding 0.3s ease',
       }}>
-        <h1 style={{
-          fontFamily: "'Cinzel', serif",
-          fontSize: 'clamp(0.85rem, 2.5vw, 1.35rem)', fontWeight: 900,
-          letterSpacing: '0.18em', textTransform: 'uppercase',
-          color: titleColor, transition: 'color 1.2s ease', margin: 0,
+        <div style={{
+          width: '100%', maxWidth: '1260px', display: 'flex', alignItems: 'center',
+          justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap',
+          opacity: headerVisible ? 1 : 0,
+          transform: headerVisible ? 'translateY(0)' : 'translateY(-12px)',
+          transition: 'opacity 0.7s ease, transform 0.7s ease',
         }}>
-          {titleText}
-        </h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.72rem' }}>
+            <span aria-hidden="true" style={{
+              display: 'inline-block', width: '16px', height: '16px', background: accentColor,
+              clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)', transform: 'translateY(-1px)',
+            }} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.05rem' }}>
+              <span style={{
+                color: textColor,
+                fontFamily: "'Cinzel', serif",
+                fontSize: mobileHeader ? '0.82rem' : '0.8rem',
+                fontWeight: 700,
+                letterSpacing: '0.24em',
+                textTransform: 'uppercase',
+              }}>
+                Worship-Saint
+              </span>
+              <span style={{
+                color: accentColor,
+                fontFamily: "'Cinzel', serif",
+                fontSize: mobileHeader ? '0.62rem' : '0.64rem',
+                fontWeight: 700,
+                letterSpacing: '0.24em',
+                textTransform: 'uppercase',
+              }}>
+                Estudio de impacto
+              </span>
+            </div>
+          </div>
+
+          {mobileHeader ? (
+            <button
+              type="button"
+              aria-label={menuOpen ? 'Cerrar menú' : 'Abrir menú'}
+              aria-expanded={menuOpen}
+              onClick={() => setMenuOpen(prev => !prev)}
+              style={{
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                width: '42px', height: '42px', borderRadius: '999px',
+                border: `1px solid ${linkColor}`, background: 'rgba(255,255,255,0.06)',
+                color: linkColor, cursor: 'pointer', transition: 'transform 0.2s ease',
+              }}
+            >
+              <span style={{
+                width: '20px', height: '2px', background: linkColor, display: 'block',
+                boxShadow: `0 -6px 0 ${linkColor}, 0 6px 0 ${linkColor}`,
+                transform: menuOpen ? 'rotate(90deg)' : 'none',
+                transition: 'transform 0.2s ease',
+              }} />
+            </button>
+          ) : (
+            <nav aria-label="Navegación principal" style={{
+              display: 'flex', flexWrap: 'wrap', gap: '1rem', justifyContent: 'flex-end', alignItems: 'center',
+            }}>
+              {[
+                { label: 'Inicio', href: '#inicio' },
+                { label: 'Nuestras obras', href: '#nuestras-obras' },
+                { label: 'Quiénes somos', href: '#quienes-somos' },
+                { label: 'Servicios', href: '#servicios' },
+              ].map(link => (
+                <a
+                  key={link.href}
+                  href={link.href}
+                  style={{
+                    color: linkColor,
+                    fontFamily: "'Cinzel', serif",
+                    fontSize: '0.82rem',
+                    fontWeight: 700,
+                    letterSpacing: '0.18em',
+                    textTransform: 'uppercase',
+                    textDecoration: 'none',
+                    transition: 'color 0.25s ease',
+                  }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = '#ffffff'; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = linkColor; }}
+                >
+                  {link.label}
+                </a>
+              ))}
+            </nav>
+          )}
+        </div>
+
+        {!mobileHeader && (
+          <div style={{ width: '100%', maxWidth: '1260px', marginTop: '0.35rem', textAlign: 'center' }}>
+            <h1 style={{
+              fontFamily: "'Cinzel', serif",
+              fontSize: 'clamp(1rem, 2.8vw, 1.95rem)',
+              fontWeight: 900,
+              letterSpacing: '0.18em',
+              textTransform: 'uppercase',
+              color: titleColor,
+              margin: 0,
+              lineHeight: 1.05,
+            }}>
+              {titleText}
+            </h1>
+          </div>
+        )}
       </header>
+
+      {mobileHeader && menuOpen && headerVisible && (
+        <nav aria-label="Menú móvil" style={{
+          position: 'absolute', top: mobileHeader ? '72px' : '60px', right: 18, left: 18,
+          zIndex: 51, display: 'flex', flexDirection: 'column', gap: '0.75rem',
+          padding: '1rem', background: 'rgba(0,0,0,0.72)', borderRadius: '18px',
+          border: `1px solid ${linkColor}`, backdropFilter: 'blur(14px)',
+          boxShadow: '0 18px 50px rgba(0,0,0,0.25)',
+          transition: 'opacity 0.25s ease',
+        }}>
+          {[
+            { label: 'Inicio', href: '#inicio' },
+            { label: 'Nuestras obras', href: '#nuestras-obras' },
+            { label: 'Quiénes somos', href: '#quienes-somos' },
+            { label: 'Servicios', href: '#servicios' },
+          ].map(link => (
+            <a
+              key={link.href}
+              href={link.href}
+              onClick={() => setMenuOpen(false)}
+              style={{
+                color: linkColor,
+                fontFamily: "'Cinzel', serif",
+                fontSize: '0.96rem',
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                textDecoration: 'none',
+                padding: '0.9rem 1rem',
+                borderRadius: '14px',
+                background: 'rgba(255,255,255,0.04)',
+                transition: 'background 0.25s ease',
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.08)'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.04)'; }}
+            >
+              {link.label}
+            </a>
+          ))}
+        </nav>
+      )}
 
       {/* ── Canvas fondo (Tony + columnas) — zIndex 1 ── */}
       <canvas ref={bgCanvasRef}
