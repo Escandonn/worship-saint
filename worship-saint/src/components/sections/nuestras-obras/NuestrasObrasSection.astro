@@ -1,0 +1,19 @@
+---
+const title = 'Nuestras obras';
+const description = 'Cada proyecto se monta como un capítulo completo: arte, copy, animación y efectos que se sienten tan reales como un relato épico.';
+const bullets = ['Portales interactivos', 'Filmes de marca', 'Visual storytelling'];
+---
+
+<section id="nuestras-obras" class="section theme-iron">
+  <div class="section-frame">
+    <div class="section-copy">
+      <span class="section-label">{title}</span>
+      <p class="section-text">{description}</p>
+      <div class="section-items">
+        {bullets.map(item => (
+          <span class="section-item">{item}</span>
+        ))}
+      </div>
+    </div>
+  </div>
+</section>

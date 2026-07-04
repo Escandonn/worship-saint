@@ -3,11 +3,19 @@ import React, { useEffect, useRef, useState } from 'react';
 interface TypewriterProps {
   text: string;
   speed?: number;
+  className?: string;
+  style?: React.CSSProperties;
   /** Tiempo en ms que el texto permanece visible DESPUÉS de terminar de escribirse. Default: 6000ms */
   readDelay?: number;
 }
 
-export default function TypewriterText({ text, speed = 38, readDelay = 6000 }: TypewriterProps) {
+export default function TypewriterText({
+  text,
+  speed = 38,
+  readDelay = 6000,
+  className,
+  style,
+}: TypewriterProps) {
   const textRef    = useRef<HTMLSpanElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(true);
@@ -47,6 +55,7 @@ export default function TypewriterText({ text, speed = 38, readDelay = 6000 }: T
   return (
     <div
       ref={wrapperRef}
+      className={className}
       style={{
         position: 'absolute',
         bottom: '2rem',
@@ -56,6 +65,7 @@ export default function TypewriterText({ text, speed = 38, readDelay = 6000 }: T
         width: 'min(340px, calc(100vw - 4rem))',
         minHeight: '10rem',   // reserva espacio fijo → CLS = 0
         opacity: 1,
+        ...style,
       }}
     >
       <p

@@ -1,0 +1,19 @@
+---
+const title = 'Quiénes somos';
+const description = 'Un equipo creativo que une tecnología con espíritu iconoclasta para crear marcas legendarias y momentos inolvidables.';
+const bullets = ['Concepto estratégico', 'Producción ágil', 'Diseño emocional'];
+---
+
+<section id="quienes-somos" class="section theme-saint">
+  <div class="section-frame">
+    <div class="section-copy">
+      <span class="section-label">{title}</span>
+      <p class="section-text">{description}</p>
+      <div class="section-items">
+        {bullets.map(item => (
+          <span class="section-item">{item}</span>
+        ))}
+      </div>
+    </div>
+  </div>
+</section>

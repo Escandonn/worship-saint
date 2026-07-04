@@ -18,7 +18,8 @@ import "../styles/global.css";
     <style>
       /* Reset para prevenir CLS causado por márgenes/scroll del body */
       *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-      html, body { width: 99%; height: 100%; overflow: hidden; }
+      html { width: 100%; scroll-behavior: smooth; }
+      body { min-height: 100%; }
     </style>
   </head>
 

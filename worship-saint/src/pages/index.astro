@@ -1,25 +1,16 @@
 ---
 import Layout from "../layouts/Layout.astro";
-import ScratchReveal from "../components/ScratchReveal";
-import TypewriterText from "../components/TypewriterText";
-
-import doctorDoom from "../assets/doctor-doom.jpg";
-import tony from "../assets/tony.jpg";
-
-
-const marketingCopy = "¿Sabías que el mismo actor de Iron Man interpretará al temible Doctor Dooom? Toca toda la imagen y descubre quién es... Dos polos opuestos: El héroe que salvó al universo frente al villano que buscará conquistarlo.";
+import InicioSection from "../components/sections/inicio/InicioSection.astro";
+import ServiciosSection from "../components/sections/servicios/ServiciosSection.astro";
+import NuestrasObrasSection from "../components/sections/nuestras-obras/NuestrasObrasSection.astro";
+import QuienesSomosSection from "../components/sections/quienes-somos/QuienesSomosSection.astro";
 ---
 
 <Layout>
-  <main class="fixed inset-0">
-    {/* Efecto Scratch Premium con Partículas Físicas y Cambio de Tema */}
-    <ScratchReveal 
-      client:load 
-      foreground={doctorDoom.src} 
-      background={tony.src}
-      brushSize={140}
-    />
-
-    <TypewriterText client:load text={marketingCopy} speed={38} readDelay={7000} />
+  <main class="page-shell">
+    <InicioSection />
+    <ServiciosSection />
+    <NuestrasObrasSection />
+    <QuienesSomosSection />
   </main>
 </Layout>

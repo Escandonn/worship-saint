@@ -1,0 +1,23 @@
+---
+const { id, label, text, theme, items } = Astro.props as {
+  id: string;
+  label: string;
+  text: string;
+  theme: string;
+  items: string[];
+};
+---
+
+<section id={id} class={`section theme-${theme}`}>
+  <div class="section-frame">
+    <div class="section-copy">
+      <span class="section-label">{label}</span>
+      <p class="section-text">{text}</p>
+      <div class="section-items">
+        {items.map(item => (
+          <span class="section-item">{item}</span>
+        ))}
+      </div>
+    </div>
+  </div>
+</section>

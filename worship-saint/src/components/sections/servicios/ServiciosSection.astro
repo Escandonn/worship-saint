@@ -1,0 +1,19 @@
+---
+const title = 'Servicios';
+const description = 'Transformamos tus ideas en experiencias visuales únicas con diseño, branding y contenidos inmersivos.';
+const bullets = ['Transformación de marca', 'Diseño cinematográfico', 'Estrategia narrativa'];
+---
+
+<section id="servicios" class="section theme-doom">
+  <div class="section-frame">
+    <div class="section-copy">
+      <span class="section-label">{title}</span>
+      <p class="section-text">{description}</p>
+      <div class="section-items">
+        {bullets.map(item => (
+          <span class="section-item">{item}</span>
+        ))}
+      </div>
+    </div>
+  </div>
+</section>
