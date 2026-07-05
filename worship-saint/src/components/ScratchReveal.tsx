@@ -26,15 +26,18 @@ function drawSideColumns(
   imgX: number,       // borde izq de la imagen
   imgRight: number,   // borde der de la imagen
   isRevealed: boolean,
-  t: number           // tiempo animación 0-∞
+  t: number,          // tiempo animación 0-∞
+  avgColor?: { r: number; g: number; b: number } | null
 ) {
   const colW = Math.max(0, imgX); // ancho de cada columna lateral
   if (colW < 2) return;           // en móvil no hay espacio
 
-  // Colores temáticos
-  const primary   = isRevealed ? '#8B0000' : '#0a2a0a'; // rojo Doom/verde Doom
+  // Colores temáticos (restaurados a valores originales)
+  const primary   = isRevealed ? '#8B0000' : '#0a2a0a';
   const secondary = isRevealed ? '#D4AF37' : '#2a6a2a';
   const accent    = isRevealed ? '#FF4500' : '#00ff88';
+
+  // vividez: animación de la superposición dorada será calculada más abajo
 
   // Pulso animado (sin CSS, solo con Math.sin)
   const pulse = 0.15 + 0.08 * Math.sin(t * 0.002);
@@ -93,6 +96,21 @@ function drawSideColumns(
     ctx.arc(imgRight + (w - imgRight) * 0.65, y, r, 0, Math.PI * 2);
     ctx.fill();
   }
+  // Overlay sutil de dorado/amarillo para dar vividez (se mueve con pulse)
+  const yellow = { r: 255, g: 213, b: 74 }; // amarillo
+  const gold   = { r: 212, g: 175, b: 55 }; // dorado
+  const mix = (c1: any, c2: any, f: number) => `rgb(${Math.round(c1.r * (1 - f) + c2.r * f)}, ${Math.round(c1.g * (1 - f) + c2.g * f)}, ${Math.round(c1.b * (1 - f) + c2.b * f)})`;
+  const shimmerF = 0.5 + 0.5 * Math.sin(t * 0.002);
+  const shimmerStart = mix(yellow, gold, Math.max(0, shimmerF));
+  const shimmerEnd = mix(gold, yellow, Math.max(0, 1 - shimmerF));
+  const overlay = ctx.createLinearGradient(0, 0, colW, 0);
+  overlay.addColorStop(0,   shimmerStart);
+  overlay.addColorStop(0.5, shimmerEnd);
+  overlay.addColorStop(1,   'transparent');
+  ctx.globalAlpha = 0.06 + 0.06 * Math.abs(Math.sin(t * 0.004));
+  ctx.fillStyle = overlay;
+  ctx.fillRect(0, 0, colW, h);
+  ctx.fillRect(imgRight, 0, w - imgRight, h);
 
   ctx.globalAlpha = 1; // reset
 }
@@ -111,6 +129,7 @@ export default function ScratchReveal({
 
   const pointerState   = usePointer(containerRef);
   const particleSystem = useRef(new ParticleSystem());
+  const avgColorRef = useRef<{ r: number; g: number; b: number } | null>(null);
   const rafId          = useRef<number | null>(null);
   const startTime      = useRef<number>(0); // para animación columnas
   const lastTime       = useRef<number>(0);
@@ -121,7 +140,7 @@ export default function ScratchReveal({
   const [isRevealed, setIsRevealed] = useState(false);
   const [showNextOverlay, setShowNextOverlay] = useState(false);
   const [textComplete, setTextComplete] = useState(false);
-  const [showFaceOverlay, setShowFaceOverlay] = useState(false);
+  const [finalApplied, setFinalApplied] = useState(false);
   const timersRef = useRef<number[]>([]);
   const finalBgAppliedRef = useRef(false);
   const userInteractedRef = useRef(false);
@@ -155,18 +174,16 @@ export default function ScratchReveal({
     if (!isRevealed) return;
 
     setTextComplete(false);
-    setShowFaceOverlay(true);
     setShowNextOverlay(false);
 
-    // Mantener la cara central visible 1400ms, luego mostrar el marketing
+    // Mostrar el overlay de marketing tras un breve retardo (sin el título central)
     const t1 = window.setTimeout(() => {
-      setShowFaceOverlay(false);
       setShowNextOverlay(true);
 
       // Fallback: ocultar el overlay de marketing si no se cierra por Typewriter
       const t2 = window.setTimeout(() => setShowNextOverlay(false), 9000);
       timersRef.current.push(t2);
-    }, 1400);
+    }, 600);
 
     timersRef.current.push(t1);
 
@@ -187,11 +204,12 @@ export default function ScratchReveal({
       const bgCanvas = bgCanvasRef.current;
       const scratchCanvas = scratchCanvasRef.current;
       if (!bgCanvas || !scratchCanvas) {
-        imgsRef.current.bg = newBg;
-        finalBgAppliedRef.current = true;
-        try { initCanvasRef.current && initCanvasRef.current(); } catch (e) { /* noop */ }
-        return;
-      }
+          imgsRef.current.bg = newBg;
+          finalBgAppliedRef.current = true;
+          try { initCanvasRef.current && initCanvasRef.current(); } catch (e) { /* noop */ }
+          setFinalApplied(true);
+          return;
+        }
 
       // Draw new background immediately underneath
       imgsRef.current.bg = newBg;
@@ -236,6 +254,7 @@ export default function ScratchReveal({
           // finish: ensure canvas is cleared (fully reveal)
           scratchCtx.clearRect(0, 0, scratchCanvas.width, scratchCanvas.height);
           finalBgAppliedRef.current = true;
+          setFinalApplied(true);
           finalRevealRunningRef.current = false;
         }
       };
@@ -253,6 +272,39 @@ export default function ScratchReveal({
   // Bounding box de la imagen (para columnas)
   const imgBoundsRef = useRef({ x: 0, right: 0, w: 0, h: 0 });
   const initCanvasRef = useRef<(() => void) | null>(null);
+
+  // compute average color of an image for lively side columns
+  const computeAverageColor = (img: HTMLImageElement | null) => {
+    try {
+      if (!img) return null;
+      const cw = 32, ch = 32;
+      const c = document.createElement('canvas');
+      c.width = cw; c.height = ch;
+      const ctx = c.getContext('2d');
+      if (!ctx) return null;
+      ctx.drawImage(img, 0, 0, cw, ch);
+      const data = ctx.getImageData(0, 0, cw, ch).data;
+      let r = 0, g = 0, b = 0, count = 0;
+      for (let i = 0; i < data.length; i += 4) {
+        const alpha = data[i + 3];
+        if (alpha === 0) continue;
+        r += data[i]; g += data[i + 1]; b += data[i + 2]; count++;
+      }
+      if (count === 0) return null;
+      return { r: Math.round(r / count), g: Math.round(g / count), b: Math.round(b / count) };
+    } catch (e) {
+      return null;
+    }
+  };
+
+  const renderPerLetter = (text: string) => {
+    return text.split('').map((ch, i) => (
+      <span key={`${text}-${i}`} className="sweep-letter" style={{ position: 'relative', display: 'inline-block', overflow: 'visible', marginRight: ch === ' ' ? '0.18em' : undefined }}>
+        <span style={{ position: 'relative', zIndex: 1 }}>{ch}</span>
+        <span className="sweep-bar" style={{ animationDelay: `${i * 0.07}s` }} />
+      </span>
+    ));
+  };
 
   useEffect(() => {
     const container      = containerRef.current;
@@ -273,7 +325,11 @@ export default function ScratchReveal({
     const fgImg  = new Image(); fgImg.crossOrigin  = 'anonymous';
     const midImg = new Image(); midImg.crossOrigin = 'anonymous';
 
-    bgImg.onload  = () => { imgsRef.current.bg  = bgImg;  onLoad(); };
+    bgImg.onload = () => {
+      imgsRef.current.bg = bgImg;
+      try { avgColorRef.current = computeAverageColor(bgImg); } catch (e) { avgColorRef.current = null; }
+      onLoad();
+    };
     fgImg.onload  = () => { imgsRef.current.fg  = fgImg;  onLoad(); };
     midImg.onload = () => { imgsRef.current.mid = midImg; onLoad(); };
 
@@ -399,7 +455,7 @@ export default function ScratchReveal({
         // Columnas laterales (solo en PC donde hay espacio)
         if (!mobile) {
           const b = imgBoundsRef.current;
-          drawSideColumns(bgCtx, rect.width, rect.height, b.x, b.right, isRevealedRef.current, elapsed);
+          drawSideColumns(bgCtx, rect.width, rect.height, b.x, b.right, isRevealedRef.current, elapsed, avgColorRef.current);
         }
       }
 
@@ -490,22 +546,7 @@ export default function ScratchReveal({
       )}
 
       {/* ── HEADER ── */}
-      {showFaceOverlay && (
-        <div style={{
-          position: 'absolute', inset: 0, zIndex: 53,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          pointerEvents: 'none',
-        }}>
-          <div style={{
-            padding: '1rem 1.4rem', borderRadius: '14px',
-            background: 'rgba(0,0,0,0.45)', color: '#fff',
-            fontFamily: "'Cinzel', serif", fontWeight: 800,
-            fontSize: 'clamp(1.2rem, 3.2vw, 2.4rem)', letterSpacing: '0.22em',
-          }}>
-            ARIOMAN
-          </div>
-        </div>
-      )}
+      
       <header style={{
         position: 'absolute', top: 0, left: 0, width: '100%', zIndex: 50,
         padding: mobileHeader ? '14px 18px' : '12px 20px',
@@ -516,39 +557,38 @@ export default function ScratchReveal({
         borderBottom: `1px solid ${headerBorder}`,
         boxShadow: headerGlow,
         transition: 'background-color 1.2s ease, box-shadow 1.2s ease, border-color 1.2s ease, padding 0.3s ease',
+        // sweep colors: --sweep-color-1 (accent), --sweep-color-2 (highlight)
+        ...(finalApplied ? { ['--sweep-color-1' as any]: '#FFD27A', ['--sweep-color-2' as any]: '#FFFFFF' } as React.CSSProperties : { ['--sweep-color-1' as any]: '#9CFFB8', ['--sweep-color-2' as any]: '#FFFFFF' } as React.CSSProperties),
       }}>
-        <div style={{
-          width: '100%', maxWidth: '1260px', display: 'flex', alignItems: 'center',
-          justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap',
-          opacity: headerVisible ? 1 : 0,
-          transform: headerVisible ? 'translateY(0)' : 'translateY(-12px)',
-          transition: 'opacity 0.7s ease, transform 0.7s ease',
-        }}>
+          <div style={{
+            width: '100%', maxWidth: '1260px', display: 'flex', alignItems: 'center',
+            justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap',
+            opacity: headerVisible ? 1 : 0,
+            transform: headerVisible ? 'translateY(0)' : 'translateY(-12px)',
+            transition: 'opacity 0.7s ease, transform 0.7s ease',
+          }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.72rem' }}>
             <span aria-hidden="true" style={{
               display: 'inline-block', width: '16px', height: '16px', background: accentColor,
               clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)', transform: 'translateY(-1px)',
             }} />
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.05rem' }}>
-              <span style={{
-                color: textColor,
-                fontFamily: "'Cinzel', serif",
-                fontSize: mobileHeader ? '0.82rem' : '0.8rem',
-                fontWeight: 700,
-                letterSpacing: '0.24em',
-                textTransform: 'uppercase',
-              }}>
+              <style>{`
+                .sweep-text { position: relative; display: inline-block; overflow: hidden; }
+                .sweep-text .sweep-bar { position: absolute; left: -160%; top: -10%; height: 120%; width: 160%;
+                  background: linear-gradient(90deg, transparent 0%, var(--sweep-color-1, rgba(255,255,255,0.95)) 45%, var(--sweep-color-2, rgba(255,255,255,0.6)) 55%, transparent 100%);
+                  transform: skewX(-18deg);
+                  pointer-events: none; opacity: 0.95; }
+                @keyframes sweepLR { from { left: -160%; } to { left: 160%; } }
+                .sweep-on .sweep-bar { animation: sweepLR 1.6s ease-in-out forwards; }
+              `}</style>
+              <span className={headerVisible ? 'sweep-text sweep-on' : 'sweep-text'} style={{ color: textColor, fontFamily: "'Cinzel', serif", fontSize: mobileHeader ? '0.82rem' : '0.8rem', fontWeight: 700, letterSpacing: '0.24em', textTransform: 'uppercase' }}>
                 Worship-Saint
+                <span className="sweep-bar" />
               </span>
-              <span style={{
-                color: accentColor,
-                fontFamily: "'Cinzel', serif",
-                fontSize: mobileHeader ? '0.62rem' : '0.64rem',
-                fontWeight: 700,
-                letterSpacing: '0.24em',
-                textTransform: 'uppercase',
-              }}>
+              <span className={headerVisible ? 'sweep-text sweep-on' : 'sweep-text'} style={{ color: accentColor, fontFamily: "'Cinzel', serif", fontSize: mobileHeader ? '0.62rem' : '0.64rem', fontWeight: 700, letterSpacing: '0.24em', textTransform: 'uppercase' }}>
                 Estudio de impacto
+                <span className="sweep-bar" />
               </span>
             </div>
           </div>
