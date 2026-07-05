@@ -60,20 +60,23 @@ export function usePointer(containerRef: React.RefObject<HTMLElement | null>) {
 
     const handlePointerMove = (e: Event) => {
       const pe = e as PointerEvent;
-      // In this effect, hovering acts as drawing
+      if (!state.current.isDrawing) return;
       updatePoint(pe.clientX, pe.clientY, true);
     };
 
     const handlePointerUp = () => {
-      state.current.isDrawing = false;
-      state.current.speed = 0;
-      state.current.lastX = null;
-      state.current.lastY = null;
+      const current = state.current;
+      current.isDrawing = false;
+      current.speed = 0;
+      current.lastX = null;
+      current.lastY = null;
     };
 
     const handlePointerEnter = (e: Event) => {
       const pe = e as PointerEvent;
-      updatePoint(pe.clientX, pe.clientY, true);
+      if (state.current.isDrawing) {
+        updatePoint(pe.clientX, pe.clientY, true);
+      }
     };
 
     const handlePointerLeave = () => {

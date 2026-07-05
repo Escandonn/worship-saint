@@ -7,6 +7,7 @@ interface ScratchRevealProps {
   foreground: string;       // Doom ojos abiertos
   midground: string;        // Doom ojos cerrados (transición)
   background: string;       // Tony / Iron Man
+  afterReveal?: string;     // opcional: imagen a mostrar después del texto de rostro
   brushSize?: number;
 }
 
@@ -99,6 +100,7 @@ export default function ScratchReveal({
   foreground,
   midground,
   background,
+  afterReveal,
   brushSize = 140,
 }: ScratchRevealProps) {
   const containerRef     = useRef<HTMLDivElement>(null);
@@ -116,6 +118,8 @@ export default function ScratchReveal({
   const scratchProgress = useRef(0);       // 0 = Doom abierto, 1 = Tony
   const isRevealedRef   = useRef(false);
   const [isRevealed, setIsRevealed] = useState(false);
+  const [showFaceOverlay, setShowFaceOverlay] = useState(false);
+  const [showNextOverlay, setShowNextOverlay] = useState(false);
   const [headerVisible, setHeaderVisible] = useState(false);
   const [heroTitleVisible, setHeroTitleVisible] = useState(true);
   const [mobileHeader, setMobileHeader] = useState(false);
@@ -136,7 +140,35 @@ export default function ScratchReveal({
     };
   }, []);
 
-  // Imágenes pre-cargadas — guardadas en ref para acceso desde el loop
+  useEffect(() => {
+    let overlayTimer: number;
+    let nextTimer: number;
+    if (isRevealed) {
+      setShowFaceOverlay(true);
+      setShowNextOverlay(false);
+      overlayTimer = window.setTimeout(() => {
+        setShowFaceOverlay(false);
+        setShowNextOverlay(true);
+
+        // Si se ha pasado una imagen extra para mostrar tras el texto, la cargamos y la ponemos como fondo
+        if (afterReveal) {
+          const newBg = new Image();
+          newBg.crossOrigin = 'anonymous';
+          newBg.onload = () => {
+            imgsRef.current.bg = newBg;
+            try { initCanvasRef.current && initCanvasRef.current(); } catch (e) { /* noop */ }
+          };
+          newBg.src = afterReveal;
+        }
+
+        nextTimer = window.setTimeout(() => setShowNextOverlay(false), 1600);
+      }, 1400);
+    }
+    return () => {
+      window.clearTimeout(overlayTimer);
+      window.clearTimeout(nextTimer);
+    };
+  }, [isRevealed, afterReveal]);
   const imgsRef = useRef<{
     bg: HTMLImageElement | null;
     fg: HTMLImageElement | null;
@@ -145,6 +177,7 @@ export default function ScratchReveal({
 
   // Bounding box de la imagen (para columnas)
   const imgBoundsRef = useRef({ x: 0, right: 0, w: 0, h: 0 });
+  const initCanvasRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     const container      = containerRef.current;
@@ -217,6 +250,8 @@ export default function ScratchReveal({
       }
     };
 
+    initCanvasRef.current = initCanvas;
+
     startTime.current = performance.now();
     lastTime.current  = startTime.current;
 
@@ -235,8 +270,8 @@ export default function ScratchReveal({
       if (state.isDrawing && state.x !== null && state.y !== null && state.lastX !== null && state.lastY !== null) {
         const dist = Math.sqrt((state.x - state.lastX) ** 2 + (state.y - state.lastY) ** 2);
 
-        // Progreso total: 0 → 1 (8000px de recorrido total)
-        scratchProgress.current = Math.min(1, scratchProgress.current + dist / 8000);
+        // Progreso total: 0 → 1 (4500px de recorrido total para mayor sensibilidad)
+        scratchProgress.current = Math.min(1, scratchProgress.current + dist / 4500);
 
         // Revelar Iron Man al 100%
         if (scratchProgress.current >= 1 && !isRevealedRef.current) {
@@ -356,6 +391,70 @@ export default function ScratchReveal({
           }}>
             {titleText}
           </h1>
+        </div>
+      )}
+
+      {showFaceOverlay && (
+        <div style={{
+          position: 'absolute', inset: 0, zIndex: 54,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          pointerEvents: 'none', padding: mobileHeader ? '1.2rem' : '2rem',
+        }}>
+          <div style={{
+            maxWidth: 'min(88vw, 520px)', width: '100%',
+            padding: '1rem 1.2rem',
+            background: 'rgba(1, 8, 12, 0.82)',
+            border: `1px solid ${accentColor}`,
+            borderRadius: '24px',
+            boxShadow: '0 22px 80px rgba(0,0,0,0.48)',
+            backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)',
+          }}>
+            <p style={{
+              margin: 0,
+              color: '#ffffff',
+              fontFamily: "'Cinzel', serif",
+              fontSize: mobileHeader ? '1.1rem' : '1.5rem',
+              fontWeight: 800,
+              letterSpacing: '0.24em',
+              textAlign: 'center',
+              textTransform: 'uppercase',
+              lineHeight: 1.15,
+            }}>
+              Arioman
+            </p>
+          </div>
+        </div>
+      )}
+
+      {showNextOverlay && (
+        <div style={{
+          position: 'absolute', inset: 0, zIndex: 54,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          pointerEvents: 'none', padding: mobileHeader ? '1.2rem' : '2rem',
+        }}>
+          <div style={{
+            maxWidth: 'min(88vw, 520px)', width: '100%',
+            padding: '1rem 1.2rem',
+            background: 'rgba(1, 8, 12, 0.82)',
+            border: `1px solid ${accentColor}`,
+            borderRadius: '24px',
+            boxShadow: '0 22px 80px rgba(0,0,0,0.48)',
+            backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)',
+          }}>
+            <p style={{
+              margin: 0,
+              color: '#ffffff',
+              fontFamily: "'Cinzel', serif",
+              fontSize: mobileHeader ? '1rem' : '1.3rem',
+              fontWeight: 700,
+              letterSpacing: '0.18em',
+              textAlign: 'center',
+              textTransform: 'uppercase',
+              lineHeight: 1.4,
+            }}>
+              Descubre quién se esconde detrás del casco
+            </p>
+          </div>
         </div>
       )}
 
