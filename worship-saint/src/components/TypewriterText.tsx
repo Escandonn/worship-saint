@@ -5,6 +5,8 @@ interface TypewriterProps {
   speed?: number;
   className?: string;
   style?: React.CSSProperties;
+  /** Si es false, no dibuja recuadro de fondo sobre el texto. */
+  bubble?: boolean;
   /** Tiempo en ms que el texto permanece visible DESPUÉS de terminar de escribirse. Default: 6000ms */
   readDelay?: number;
   onComplete?: () => void;
@@ -17,20 +19,28 @@ export default function TypewriterText({
   readDelay = 6000,
   className,
   style,
+  bubble = true,
   onComplete,
   autoHide = true,
 }: TypewriterProps) {
   const textRef    = useRef<HTMLSpanElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const onCompleteRef = useRef<(() => void) | undefined>(onComplete);
   const typeTimerRef = useRef<number | null>(null);
   const fadeTimerRef = useRef<number | null>(null);
+  const completedRef = useRef(false);
   const [visible, setVisible] = useState(true);
+
+  useEffect(() => {
+    onCompleteRef.current = onComplete;
+  }, [onComplete]);
 
   useEffect(() => {
     if (!textRef.current || !wrapperRef.current) return;
     textRef.current.textContent = '';
     wrapperRef.current.style.opacity = '1';
     wrapperRef.current.style.transition = '';
+    completedRef.current = false;
     let i = 0;
 
     // Escribe letra a letra sin re-renders de React
@@ -42,7 +52,10 @@ export default function TypewriterText({
           window.clearInterval(typeTimerRef.current);
           typeTimerRef.current = null;
         }
-        if (onComplete) onComplete();
+        if (!completedRef.current) {
+          completedRef.current = true;
+          if (onCompleteRef.current) onCompleteRef.current();
+        }
 
         if (autoHide) {
           fadeTimerRef.current = window.setTimeout(() => {
@@ -70,7 +83,7 @@ export default function TypewriterText({
         fadeTimerRef.current = null;
       }
     };
-  }, [text, speed, readDelay, onComplete]);
+  }, [text, speed, readDelay, autoHide]);
 
   if (!visible) return null;
 
@@ -79,14 +92,16 @@ export default function TypewriterText({
       ref={wrapperRef}
       className={className}
       style={{
-        position: 'absolute',
-        bottom: '2rem',
-        left: '2rem',
-        zIndex: 50,
+        position: bubble ? 'absolute' : 'static',
+        bottom: bubble ? '2rem' : undefined,
+        left: bubble ? '2rem' : undefined,
+        zIndex: bubble ? 50 : undefined,
         pointerEvents: 'none',
-        width: 'min(340px, calc(100vw - 4rem))',
-        minHeight: '10rem',   // reserva espacio fijo → CLS = 0
+        width: bubble ? 'min(340px, calc(100vw - 4rem))' : 'auto',
+        minHeight: bubble ? '10rem' : '0',
         opacity: 1,
+        background: 'transparent',
+        display: bubble ? 'block' : 'inline-block',
         ...style,
       }}
     >
@@ -97,14 +112,14 @@ export default function TypewriterText({
           fontSize: 'clamp(0.82rem, 1.5vw, 1rem)',
           lineHeight: 1.75,
           color: '#e8e8e8',
-          background: 'rgba(0,0,0,0.55)',
-          padding: '1rem 1.25rem',
-          borderRadius: '12px',
-          border: '1px solid rgba(255,255,255,0.1)',
-          backdropFilter: 'blur(14px)',
-          WebkitBackdropFilter: 'blur(14px)',
+          background: 'transparent',
+          padding: 0,
+          borderRadius: 0,
+          border: 'none',
+          backdropFilter: 'none',
+          WebkitBackdropFilter: 'none',
           margin: 0,
-          minHeight: '10rem',
+          minHeight: 'auto',
           boxSizing: 'border-box',
         }}
       >

@@ -560,22 +560,25 @@ export default function ScratchReveal({
 
       {showSecretOverlay && (
         <div style={{
-          position: 'absolute', bottom: '3rem', left: '50%', zIndex: 54,
+          position: 'absolute',
+          top: mobileHeader ? '1.8rem' : 'auto',
+          bottom: mobileHeader ? 'auto' : '3rem',
+          left: '50%', zIndex: 54,
           transform: 'translateX(-50%)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          pointerEvents: 'none', width: mobileHeader ? '88vw' : '40vw',
-          maxWidth: '520px',
+          pointerEvents: 'none', width: mobileHeader ? '92vw' : '34vw',
+          maxWidth: mobileHeader ? '360px' : '420px',
         }}>
           <div style={{
-            width: '100%', padding: '1rem 1.4rem',
-            background: 'linear-gradient(180deg, rgba(255,203,85,0.98) 0%, rgba(196,31,31,0.96) 100%)',
-            border: '1px solid rgba(255, 140, 45, 0.85)',
-            borderRadius: '28px',
-            boxShadow: '0 36px 110px rgba(170, 50, 20, 0.55)',
-            backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)',
+            width: '100%', padding: mobileHeader ? '0.9rem 1rem' : '1rem 1.2rem',
+            background: mobileHeader ? 'rgba(7, 12, 28, 0.9)' : 'rgba(17, 14, 38, 0.95)',
+            border: mobileHeader ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(255, 140, 45, 0.85)',
+            borderRadius: '22px',
+            boxShadow: mobileHeader ? '0 18px 44px rgba(0,0,0,0.35)' : '0 36px 110px rgba(170, 50, 20, 0.45)',
+            backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)',
           }}>
             <TypewriterText
-              text="Ahora ya lo sabes, guarda nuestro secreto."
+              text="Ahora que ya lo sabes, guarda nuestro secreto y únete a nosotros."
               speed={72}
               readDelay={5200}
               autoHide={false}
@@ -596,11 +599,9 @@ export default function ScratchReveal({
                 minHeight: 'auto',
                 margin: 0,
                 fontFamily: "'Cinzel', serif",
-                fontSize: mobileHeader ? '0.95rem' : '1.1rem',
-                fontWeight: 800,
-                letterSpacing: '0.16em',
-                textAlign: 'center',
-                background: 'transparent',
+                fontSize: mobileHeader ? '0.9rem' : '1rem',
+                fontWeight: 700,
+                letterSpacing: '0.14em',
                 padding: 0,
                 border: 'none',
                 boxShadow: 'none',
