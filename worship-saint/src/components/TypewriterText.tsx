@@ -8,6 +8,7 @@ interface TypewriterProps {
   /** Tiempo en ms que el texto permanece visible DESPUÉS de terminar de escribirse. Default: 6000ms */
   readDelay?: number;
   onComplete?: () => void;
+  autoHide?: boolean;
 }
 
 export default function TypewriterText({
@@ -17,9 +18,12 @@ export default function TypewriterText({
   className,
   style,
   onComplete,
+  autoHide = true,
 }: TypewriterProps) {
   const textRef    = useRef<HTMLSpanElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const typeTimerRef = useRef<number | null>(null);
+  const fadeTimerRef = useRef<number | null>(null);
   const [visible, setVisible] = useState(true);
 
   useEffect(() => {
@@ -30,27 +34,42 @@ export default function TypewriterText({
     let i = 0;
 
     // Escribe letra a letra sin re-renders de React
-    const typeId = window.setInterval(() => {
+    typeTimerRef.current = window.setInterval(() => {
       if (textRef.current) textRef.current.textContent = text.slice(0, i + 1);
       i += 1;
       if (i >= text.length) {
-        window.clearInterval(typeId);
+        if (typeTimerRef.current) {
+          window.clearInterval(typeTimerRef.current);
+          typeTimerRef.current = null;
+        }
         if (onComplete) onComplete();
 
-        const fadeId = window.setTimeout(() => {
-          if (wrapperRef.current) {
-            wrapperRef.current.style.transition = 'opacity 1.2s ease';
-            wrapperRef.current.style.opacity = '0';
-          }
+        if (autoHide) {
+          fadeTimerRef.current = window.setTimeout(() => {
+            if (wrapperRef.current) {
+              wrapperRef.current.style.transition = 'opacity 2s ease';
+              wrapperRef.current.style.opacity = '0';
+            }
 
-          window.setTimeout(() => setVisible(false), 1300);
-        }, readDelay);
-
-        return () => window.clearTimeout(fadeId);
+            fadeTimerRef.current = window.setTimeout(() => {
+              setVisible(false);
+              fadeTimerRef.current = null;
+            }, 2200);
+          }, readDelay);
+        }
       }
     }, speed);
 
-    return () => window.clearInterval(typeId);
+    return () => {
+      if (typeTimerRef.current) {
+        window.clearInterval(typeTimerRef.current);
+        typeTimerRef.current = null;
+      }
+      if (fadeTimerRef.current) {
+        window.clearTimeout(fadeTimerRef.current);
+        fadeTimerRef.current = null;
+      }
+    };
   }, [text, speed, readDelay, onComplete]);
 
   if (!visible) return null;

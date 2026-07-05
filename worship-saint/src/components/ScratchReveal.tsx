@@ -3,6 +3,7 @@ import { usePointer } from './usePointer';
 import { drawBrush } from './Brush';
 import { ParticleSystem } from './Particles';
 import TypewriterText from './TypewriterText';
+import AIServiceCard from './AIServiceCard';
 
 interface ScratchRevealProps {
   foreground: string;       // Doom ojos abiertos
@@ -139,6 +140,9 @@ export default function ScratchReveal({
   const isRevealedRef   = useRef(false);
   const [isRevealed, setIsRevealed] = useState(false);
   const [showNextOverlay, setShowNextOverlay] = useState(false);
+  const [showSecretOverlay, setShowSecretOverlay] = useState(false);
+  const [secretOverlayShownOnce, setSecretOverlayShownOnce] = useState(false);
+  const [showAIService, setShowAIService] = useState(false);
   const [textComplete, setTextComplete] = useState(false);
   const [finalApplied, setFinalApplied] = useState(false);
   const timersRef = useRef<number[]>([]);
@@ -175,6 +179,9 @@ export default function ScratchReveal({
 
     setTextComplete(false);
     setShowNextOverlay(false);
+    setShowSecretOverlay(false);
+    setShowAIService(false);
+    setSecretOverlayShownOnce(false);
 
     // Mostrar el overlay de marketing tras un breve retardo (sin el título central)
     const t1 = window.setTimeout(() => {
@@ -263,6 +270,13 @@ export default function ScratchReveal({
     };
     newBg.src = afterReveal;
   }, [textComplete, afterReveal]);
+
+  useEffect(() => {
+    if (textComplete && finalApplied && !secretOverlayShownOnce) {
+      setShowSecretOverlay(true);
+      setSecretOverlayShownOnce(true);
+    }
+  }, [textComplete, finalApplied, secretOverlayShownOnce]);
   const imgsRef = useRef<{
     bg: HTMLImageElement | null;
     fg: HTMLImageElement | null;
@@ -512,14 +526,13 @@ export default function ScratchReveal({
             boxShadow: '0 24px 90px rgba(0,0,0,0.55)',
             backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)',
           }}>
-            <TypewriterText
+                  <TypewriterText
               text="Hora de descubrir la verdad: desliza y revela quién está detrás de la máscara."
               speed={80}
               readDelay={8000}
               onComplete={() => {
                 if (!textComplete && showNextOverlay) {
                   setTextComplete(true);
-                  // ocultar overlay de marketing tras completar para evitar replays
                   setShowNextOverlay(false);
                 }
               }}
@@ -544,6 +557,61 @@ export default function ScratchReveal({
           </div>
         </div>
       )}
+
+      {showSecretOverlay && (
+        <div style={{
+          position: 'absolute', bottom: '3rem', left: '50%', zIndex: 54,
+          transform: 'translateX(-50%)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          pointerEvents: 'none', width: mobileHeader ? '88vw' : '40vw',
+          maxWidth: '520px',
+        }}>
+          <div style={{
+            width: '100%', padding: '1rem 1.4rem',
+            background: 'linear-gradient(180deg, rgba(255,203,85,0.98) 0%, rgba(196,31,31,0.96) 100%)',
+            border: '1px solid rgba(255, 140, 45, 0.85)',
+            borderRadius: '28px',
+            boxShadow: '0 36px 110px rgba(170, 50, 20, 0.55)',
+            backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)',
+          }}>
+            <TypewriterText
+              text="Ahora ya lo sabes, guarda nuestro secreto."
+              speed={72}
+              readDelay={5200}
+              autoHide={false}
+              onComplete={() => {
+                const timer = window.setTimeout(() => {
+                  setShowAIService(true);
+                }, 1400);
+                timersRef.current.push(timer);
+                const hideTimer = window.setTimeout(() => {
+                  setShowSecretOverlay(false);
+                }, 7000);
+                timersRef.current.push(hideTimer);
+              }}
+              className="secret-box"
+              style={{
+                position: 'static',
+                width: '100%',
+                minHeight: 'auto',
+                margin: 0,
+                fontFamily: "'Cinzel', serif",
+                fontSize: mobileHeader ? '0.95rem' : '1.1rem',
+                fontWeight: 800,
+                letterSpacing: '0.16em',
+                textAlign: 'center',
+                background: 'transparent',
+                padding: 0,
+                border: 'none',
+                boxShadow: 'none',
+                color: '#ffffff',
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {showAIService && <AIServiceCard />}
 
       {/* ── HEADER ── */}
       
