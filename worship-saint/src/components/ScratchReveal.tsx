@@ -121,6 +121,11 @@ export default function ScratchReveal({
   const [isRevealed, setIsRevealed] = useState(false);
   const [showNextOverlay, setShowNextOverlay] = useState(false);
   const [textComplete, setTextComplete] = useState(false);
+  const [showFaceOverlay, setShowFaceOverlay] = useState(false);
+  const timersRef = useRef<number[]>([]);
+  const finalBgAppliedRef = useRef(false);
+  const userInteractedRef = useRef(false);
+  const finalRevealRunningRef = useRef(false);
   const [headerVisible, setHeaderVisible] = useState(false);
   const [mobileHeader, setMobileHeader] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -138,28 +143,104 @@ export default function ScratchReveal({
     };
   }, []);
 
+  // Secuencia de overlays al completarse la revelación:
+  // 1) mostrar overlay central (Arioman) breve
+  // 2) mostrar overlay de marketing (Typewriter)
+  // 3) ocultar overlay de marketing automáticamente (fallback)
   useEffect(() => {
-    let overlayTimer: number;
-    if (isRevealed) {
-      setShowNextOverlay(true);
-      setTextComplete(false);
+    // limpiar timers previos
+    timersRef.current.forEach(id => window.clearTimeout(id));
+    timersRef.current = [];
 
-      overlayTimer = window.setTimeout(() => {
-        setShowNextOverlay(false);
-      }, 6200);
-    }
+    if (!isRevealed) return;
+
+    setTextComplete(false);
+    setShowFaceOverlay(true);
+    setShowNextOverlay(false);
+
+    // Mantener la cara central visible 1400ms, luego mostrar el marketing
+    const t1 = window.setTimeout(() => {
+      setShowFaceOverlay(false);
+      setShowNextOverlay(true);
+
+      // Fallback: ocultar el overlay de marketing si no se cierra por Typewriter
+      const t2 = window.setTimeout(() => setShowNextOverlay(false), 9000);
+      timersRef.current.push(t2);
+    }, 1400);
+
+    timersRef.current.push(t1);
+
     return () => {
-      window.clearTimeout(overlayTimer);
+      timersRef.current.forEach(id => window.clearTimeout(id));
+      timersRef.current = [];
     };
   }, [isRevealed]);
 
   useEffect(() => {
     if (!textComplete || !afterReveal) return;
+    if (finalRevealRunningRef.current) return; // already animating
+
     const newBg = new Image();
     newBg.crossOrigin = 'anonymous';
     newBg.onload = () => {
+      // Start final reveal animation that uses destination-out strokes to reveal the new background
+      const bgCanvas = bgCanvasRef.current;
+      const scratchCanvas = scratchCanvasRef.current;
+      if (!bgCanvas || !scratchCanvas) {
+        imgsRef.current.bg = newBg;
+        finalBgAppliedRef.current = true;
+        try { initCanvasRef.current && initCanvasRef.current(); } catch (e) { /* noop */ }
+        return;
+      }
+
+      // Draw new background immediately underneath
       imgsRef.current.bg = newBg;
       try { initCanvasRef.current && initCanvasRef.current(); } catch (e) { /* noop */ }
+
+      // Animate programmatic scratching to reveal the new bg
+      if (finalRevealRunningRef.current) return;
+      finalRevealRunningRef.current = true;
+
+      const scratchCtx = scratchCanvas.getContext('2d', { alpha: true });
+      if (!scratchCtx) {
+        finalBgAppliedRef.current = true;
+        finalRevealRunningRef.current = false;
+        return;
+      }
+
+      const duration = 2600; // longer reveal animation for smoother transition
+      const start = performance.now();
+      let rafIdLocal: number;
+
+      const step = () => {
+        const now = performance.now();
+        const elapsed = now - start;
+        const p = Math.min(1, elapsed / duration);
+
+        // emit several synthetic brush strokes per frame, increasing with progress
+        const strokes = Math.floor(6 + p * 40);
+        for (let i = 0; i < strokes; i++) {
+          const rect = bgCanvas.getBoundingClientRect();
+          const x = Math.random() * rect.width;
+          const y = Math.random() * rect.height;
+          const lastX = x + (Math.random() - 0.5) * 40;
+          const lastY = y + (Math.random() - 0.5) * 40;
+          const fakeState = { x, y, lastX, lastY, speed: 120, isDrawing: true } as any;
+          // use existing drawBrush which uses destination-out
+          drawBrush(scratchCtx, fakeState, brushSize);
+        }
+
+        if (p < 1) {
+          rafIdLocal = requestAnimationFrame(step);
+        } else {
+          // finish: ensure canvas is cleared (fully reveal)
+          scratchCtx.clearRect(0, 0, scratchCanvas.width, scratchCanvas.height);
+          finalBgAppliedRef.current = true;
+          finalRevealRunningRef.current = false;
+        }
+      };
+
+      rafIdLocal = requestAnimationFrame(step);
     };
     newBg.src = afterReveal;
   }, [textComplete, afterReveal]);
@@ -234,9 +315,9 @@ export default function ScratchReveal({
         bgCtx.drawImage(bg, t.x, t.y, bg.width * t.scale, bg.height * t.scale);
       }
 
-      // Pintar Doom ojos abiertos en el scratchCanvas (siempre empieza fresco)
+      // Si la imagen final ya se aplicó, no redibujamos el foreground (evita volver a cubrir)
       scratchCtx.clearRect(0, 0, rect.width, rect.height);
-      if (fg) {
+      if (!finalBgAppliedRef.current && fg) {
         scratchCtx.globalCompositeOperation = 'source-over';
         scratchCtx.globalAlpha = 1;
         const t = getTransform(fg.width, fg.height, rect.width, rect.height, mobile);
@@ -267,8 +348,8 @@ export default function ScratchReveal({
         // Progreso total: 0 → 1 (4500px de recorrido total para mayor sensibilidad)
         scratchProgress.current = Math.min(1, scratchProgress.current + dist / 4500);
 
-        // Revelar Iron Man al 100%
-        if (scratchProgress.current >= 1 && !isRevealedRef.current) {
+        // Revelar Iron Man al 100% — sólo si el usuario realmente interactuó
+        if (scratchProgress.current >= 1 && userInteractedRef.current && !isRevealedRef.current) {
           isRevealedRef.current = true;
           setIsRevealed(true);
         }
@@ -297,6 +378,8 @@ export default function ScratchReveal({
         if (n > 0 || Math.random() > 0.55) {
           particleSystem.current.emit(state.x, state.y, state.speed, n || 1);
         }
+        // marcar que el usuario ha interactuado (evita reveals automáticos)
+        if (dist > 2) userInteractedRef.current = true;
       }
 
       // ── 2. Redibujar columnas laterales animadas en bgCanvas ───────────────
@@ -375,9 +458,15 @@ export default function ScratchReveal({
           }}>
             <TypewriterText
               text="Hora de descubrir la verdad: desliza y revela quién está detrás de la máscara."
-              speed={32}
-              readDelay={4200}
-              onComplete={() => setTextComplete(true)}
+              speed={80}
+              readDelay={8000}
+              onComplete={() => {
+                if (!textComplete && showNextOverlay) {
+                  setTextComplete(true);
+                  // ocultar overlay de marketing tras completar para evitar replays
+                  setShowNextOverlay(false);
+                }
+              }}
               className="marketing-reveal"
               style={{
                 position: 'static',
@@ -401,6 +490,22 @@ export default function ScratchReveal({
       )}
 
       {/* ── HEADER ── */}
+      {showFaceOverlay && (
+        <div style={{
+          position: 'absolute', inset: 0, zIndex: 53,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          pointerEvents: 'none',
+        }}>
+          <div style={{
+            padding: '1rem 1.4rem', borderRadius: '14px',
+            background: 'rgba(0,0,0,0.45)', color: '#fff',
+            fontFamily: "'Cinzel', serif", fontWeight: 800,
+            fontSize: 'clamp(1.2rem, 3.2vw, 2.4rem)', letterSpacing: '0.22em',
+          }}>
+            ARIOMAN
+          </div>
+        </div>
+      )}
       <header style={{
         position: 'absolute', top: 0, left: 0, width: '100%', zIndex: 50,
         padding: mobileHeader ? '14px 18px' : '12px 20px',
