@@ -7,6 +7,7 @@ interface TypewriterProps {
   style?: React.CSSProperties;
   /** Tiempo en ms que el texto permanece visible DESPUÉS de terminar de escribirse. Default: 6000ms */
   readDelay?: number;
+  onComplete?: () => void;
 }
 
 export default function TypewriterText({
@@ -15,40 +16,42 @@ export default function TypewriterText({
   readDelay = 6000,
   className,
   style,
+  onComplete,
 }: TypewriterProps) {
   const textRef    = useRef<HTMLSpanElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(true);
 
   useEffect(() => {
-    if (!textRef.current) return;
+    if (!textRef.current || !wrapperRef.current) return;
     textRef.current.textContent = '';
+    wrapperRef.current.style.opacity = '1';
+    wrapperRef.current.style.transition = '';
     let i = 0;
 
     // Escribe letra a letra sin re-renders de React
-    const typeId = setInterval(() => {
+    const typeId = window.setInterval(() => {
       if (textRef.current) textRef.current.textContent = text.slice(0, i + 1);
-      i++;
+      i += 1;
       if (i >= text.length) {
-        clearInterval(typeId);
+        window.clearInterval(typeId);
+        if (onComplete) onComplete();
 
-        // Después del tiempo de lectura, fade-out suave
-        const fadeId = setTimeout(() => {
+        const fadeId = window.setTimeout(() => {
           if (wrapperRef.current) {
-            wrapperRef.current.style.opacity = '0';
             wrapperRef.current.style.transition = 'opacity 1.2s ease';
+            wrapperRef.current.style.opacity = '0';
           }
-          // Una vez invisible lo ocultamos del todo (no sigue ocupando espacio Z)
-          const removeId = setTimeout(() => setVisible(false), 1300);
-          return () => clearTimeout(removeId);
+
+          window.setTimeout(() => setVisible(false), 1300);
         }, readDelay);
 
-        return () => clearTimeout(fadeId);
+        return () => window.clearTimeout(fadeId);
       }
     }, speed);
 
-    return () => clearInterval(typeId);
-  }, [text, speed, readDelay]);
+    return () => window.clearInterval(typeId);
+  }, [text, speed, readDelay, onComplete]);
 
   if (!visible) return null;
 

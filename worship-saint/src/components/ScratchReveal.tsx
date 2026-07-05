@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { usePointer } from './usePointer';
 import { drawBrush } from './Brush';
 import { ParticleSystem } from './Particles';
+import TypewriterText from './TypewriterText';
 
 interface ScratchRevealProps {
   foreground: string;       // Doom ojos abiertos
@@ -118,10 +119,9 @@ export default function ScratchReveal({
   const scratchProgress = useRef(0);       // 0 = Doom abierto, 1 = Tony
   const isRevealedRef   = useRef(false);
   const [isRevealed, setIsRevealed] = useState(false);
-  const [showFaceOverlay, setShowFaceOverlay] = useState(false);
   const [showNextOverlay, setShowNextOverlay] = useState(false);
+  const [textComplete, setTextComplete] = useState(false);
   const [headerVisible, setHeaderVisible] = useState(false);
-  const [heroTitleVisible, setHeroTitleVisible] = useState(true);
   const [mobileHeader, setMobileHeader] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -130,45 +130,39 @@ export default function ScratchReveal({
     updateMobile();
     window.addEventListener('resize', updateMobile);
 
-    const titleTimeout = window.setTimeout(() => setHeroTitleVisible(false), 1400);
     const headerTimeout = window.setTimeout(() => setHeaderVisible(true), 1700);
 
     return () => {
       window.removeEventListener('resize', updateMobile);
-      window.clearTimeout(titleTimeout);
       window.clearTimeout(headerTimeout);
     };
   }, []);
 
   useEffect(() => {
     let overlayTimer: number;
-    let nextTimer: number;
     if (isRevealed) {
-      setShowFaceOverlay(true);
-      setShowNextOverlay(false);
+      setShowNextOverlay(true);
+      setTextComplete(false);
+
       overlayTimer = window.setTimeout(() => {
-        setShowFaceOverlay(false);
-        setShowNextOverlay(true);
-
-        // Si se ha pasado una imagen extra para mostrar tras el texto, la cargamos y la ponemos como fondo
-        if (afterReveal) {
-          const newBg = new Image();
-          newBg.crossOrigin = 'anonymous';
-          newBg.onload = () => {
-            imgsRef.current.bg = newBg;
-            try { initCanvasRef.current && initCanvasRef.current(); } catch (e) { /* noop */ }
-          };
-          newBg.src = afterReveal;
-        }
-
-        nextTimer = window.setTimeout(() => setShowNextOverlay(false), 1600);
-      }, 1400);
+        setShowNextOverlay(false);
+      }, 6200);
     }
     return () => {
       window.clearTimeout(overlayTimer);
-      window.clearTimeout(nextTimer);
     };
-  }, [isRevealed, afterReveal]);
+  }, [isRevealed]);
+
+  useEffect(() => {
+    if (!textComplete || !afterReveal) return;
+    const newBg = new Image();
+    newBg.crossOrigin = 'anonymous';
+    newBg.onload = () => {
+      imgsRef.current.bg = newBg;
+      try { initCanvasRef.current && initCanvasRef.current(); } catch (e) { /* noop */ }
+    };
+    newBg.src = afterReveal;
+  }, [textComplete, afterReveal]);
   const imgsRef = useRef<{
     bg: HTMLImageElement | null;
     fg: HTMLImageElement | null;
@@ -354,11 +348,9 @@ export default function ScratchReveal({
   const headerBg     = isRevealed ? 'rgba(120,8,8,0.88)'    : 'rgba(4,28,4,0.88)';
   const headerBorder = isRevealed ? 'rgba(212,175,55,0.45)' : 'rgba(80,200,80,0.25)';
   const headerGlow   = isRevealed ? '0 4px 32px rgba(200,0,0,0.35)' : '0 4px 32px rgba(0,100,0,0.3)';
-  const titleColor   = isRevealed ? '#D4AF37' : '#88C888';
   const accentColor  = isRevealed ? '#D4AF37' : '#00ff88';
   const textColor    = isRevealed ? '#F5E2A0' : '#C7FFCD';
   const linkColor    = isRevealed ? '#F7E18C' : '#D4FFD6';
-  const titleText    = isRevealed ? '⚙ Iron Man — El Vengador de Acero' : '⚗ Doctor Doom — El Monarca del Caos';
 
   return (
     <div
@@ -366,94 +358,44 @@ export default function ScratchReveal({
       className="absolute inset-0 w-full h-full overflow-hidden touch-none"
       style={{ touchAction: 'none', background: 'transparent' }}
     >
-      {heroTitleVisible && (
-        <div style={{
-          position: 'absolute', inset: 0, zIndex: 55,
-          display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
-          pointerEvents: 'none', paddingTop: '16vw',
-          opacity: heroTitleVisible ? 1 : 0,
-          transition: 'opacity 0.4s ease',
-        }}>
-          <h1 style={{
-            maxWidth: 'min(90vw, 680px)',
-            color: titleColor,
-            fontFamily: "'Cinzel', serif",
-            fontSize: 'clamp(1.15rem, 5vw, 2rem)',
-            lineHeight: 1.05,
-            letterSpacing: '0.22em',
-            textTransform: 'uppercase',
-            textAlign: 'center',
-            background: 'rgba(0,0,0,0.15)',
-            padding: '0.8rem 1rem',
-            borderRadius: '18px',
-            border: `1px solid ${accentColor}`,
-            boxShadow: '0 18px 60px rgba(0,0,0,0.4)',
-          }}>
-            {titleText}
-          </h1>
-        </div>
-      )}
-
-      {showFaceOverlay && (
-        <div style={{
-          position: 'absolute', inset: 0, zIndex: 54,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          pointerEvents: 'none', padding: mobileHeader ? '1.2rem' : '2rem',
-        }}>
-          <div style={{
-            maxWidth: 'min(88vw, 520px)', width: '100%',
-            padding: '1rem 1.2rem',
-            background: 'rgba(1, 8, 12, 0.82)',
-            border: `1px solid ${accentColor}`,
-            borderRadius: '24px',
-            boxShadow: '0 22px 80px rgba(0,0,0,0.48)',
-            backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)',
-          }}>
-            <p style={{
-              margin: 0,
-              color: '#ffffff',
-              fontFamily: "'Cinzel', serif",
-              fontSize: mobileHeader ? '1.1rem' : '1.5rem',
-              fontWeight: 800,
-              letterSpacing: '0.24em',
-              textAlign: 'center',
-              textTransform: 'uppercase',
-              lineHeight: 1.15,
-            }}>
-              Arioman
-            </p>
-          </div>
-        </div>
-      )}
-
       {showNextOverlay && (
         <div style={{
-          position: 'absolute', inset: 0, zIndex: 54,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          pointerEvents: 'none', padding: mobileHeader ? '1.2rem' : '2rem',
+          position: 'absolute', top: '16%', right: '4%', zIndex: 54,
+          display: 'flex', alignItems: 'flex-start', justifyContent: 'flex-end',
+          pointerEvents: 'none', width: mobileHeader ? '86vw' : '32vw',
+          maxWidth: '420px',
         }}>
           <div style={{
-            maxWidth: 'min(88vw, 520px)', width: '100%',
-            padding: '1rem 1.2rem',
-            background: 'rgba(1, 8, 12, 0.82)',
+            width: '100%', padding: '1rem 1.2rem',
+            background: 'rgba(5, 12, 18, 0.88)',
             border: `1px solid ${accentColor}`,
             borderRadius: '24px',
-            boxShadow: '0 22px 80px rgba(0,0,0,0.48)',
-            backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)',
+            boxShadow: '0 24px 90px rgba(0,0,0,0.55)',
+            backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)',
           }}>
-            <p style={{
-              margin: 0,
-              color: '#ffffff',
-              fontFamily: "'Cinzel', serif",
-              fontSize: mobileHeader ? '1rem' : '1.3rem',
-              fontWeight: 700,
-              letterSpacing: '0.18em',
-              textAlign: 'center',
-              textTransform: 'uppercase',
-              lineHeight: 1.4,
-            }}>
-              Descubre quién se esconde detrás del casco
-            </p>
+            <TypewriterText
+              text="Hora de descubrir la verdad: desliza y revela quién está detrás de la máscara."
+              speed={32}
+              readDelay={4200}
+              onComplete={() => setTextComplete(true)}
+              className="marketing-reveal"
+              style={{
+                position: 'static',
+                width: '100%',
+                minHeight: 'auto',
+                margin: 0,
+                fontFamily: "'Cinzel', serif",
+                fontSize: mobileHeader ? '0.95rem' : '1.05rem',
+                fontWeight: 700,
+                letterSpacing: '0.12em',
+                textAlign: 'left',
+                background: 'transparent',
+                padding: 0,
+                border: 'none',
+                boxShadow: 'none',
+                color: '#f5f5f5',
+              }}
+            />
           </div>
         </div>
       )}
@@ -559,22 +501,6 @@ export default function ScratchReveal({
           )}
         </div>
 
-        {!mobileHeader && (
-          <div style={{ width: '100%', maxWidth: '1260px', marginTop: '0.35rem', textAlign: 'center' }}>
-            <h1 style={{
-              fontFamily: "'Cinzel', serif",
-              fontSize: 'clamp(1rem, 2.8vw, 1.95rem)',
-              fontWeight: 900,
-              letterSpacing: '0.18em',
-              textTransform: 'uppercase',
-              color: titleColor,
-              margin: 0,
-              lineHeight: 1.05,
-            }}>
-              {titleText}
-            </h1>
-          </div>
-        )}
       </header>
 
       {mobileHeader && menuOpen && headerVisible && (
