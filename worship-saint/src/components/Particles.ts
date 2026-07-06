@@ -82,13 +82,16 @@ export class ParticleSystem {
   }
 
   updateAndDraw(ctx: CanvasRenderingContext2D, deltaTime: number) {
-    // Limpiar completamente el canvas de partículas en cada frame
-    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    // No redibujar si no hay partículas (ahorra CPU/GPU en idle)
+    if (this.particles.length === 0) return;
+
+    // Limpiar usando dimensiones CSS (no backing store) — más eficiente
+    const cssW = ctx.canvas.clientWidth;
+    const cssH = ctx.canvas.clientHeight;
+    ctx.clearRect(0, 0, cssW || ctx.canvas.width, cssH || ctx.canvas.height);
     
-    // Dibujo normal sobre el canvas
     ctx.globalCompositeOperation = 'source-over'; 
 
-    // Iterar de atrás hacia adelante para poder borrar elementos del array sin romper el loop
     for (let i = this.particles.length - 1; i >= 0; i--) {
       const p = this.particles[i];
       p.update(deltaTime);

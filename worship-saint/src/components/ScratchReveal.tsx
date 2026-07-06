@@ -402,6 +402,11 @@ export default function ScratchReveal({
     startTime.current = performance.now();
     lastTime.current  = startTime.current;
 
+    // ── Flags de actividad para evitar redibujar en idle ──
+    let needsRedraw = true;
+    let lastColDraw = 0;
+    const COL_THROTTLE = 33; // ~30fps para columnas animadas
+
     // ── RENDER LOOP ─────────────────────────────────────────────────────────
     const renderLoop = (time: number) => {
       const dt      = time - lastTime.current;
@@ -413,29 +418,31 @@ export default function ScratchReveal({
       const { fg, mid } = imgsRef.current;
       const dpr = window.devicePixelRatio || 1;
 
+      const hasParticles = particleSystem.current.particles.length > 0;
+      const drawing = state.isDrawing && state.x !== null && state.y !== null && state.lastX !== null && state.lastY !== null;
+
+      // Si no hay actividad, no redibujamos (ahorra CPU/GPU en idle)
+      if (!needsRedraw && !drawing && !hasParticles && mobile) {
+        rafId.current = requestAnimationFrame(renderLoop);
+        return;
+      }
+
       // ── 1. Rascado + tracking de progreso ─────────────────────────────────
-      if (state.isDrawing && state.x !== null && state.y !== null && state.lastX !== null && state.lastY !== null) {
+      if (drawing) {
         const dist = Math.sqrt((state.x - state.lastX) ** 2 + (state.y - state.lastY) ** 2);
 
-        // Progreso total: 0 → 1 (4500px de recorrido total para mayor sensibilidad)
+        // Progreso total: 0 → 1 (4500px de recorrido total)
         scratchProgress.current = Math.min(1, scratchProgress.current + dist / 4500);
 
-        // Revelar Iron Man al 100% — sólo si el usuario realmente interactuó
         if (scratchProgress.current >= 1 && userInteractedRef.current && !isRevealedRef.current) {
           isRevealedRef.current = true;
           setIsRevealed(true);
         }
 
-        // ── Transición suave Doom-abierto → Doom-cerrado → (borra a Tony) ──
-        // Entre 0–50%: pintamos Doom ojos cerrados con alpha creciente (midground)
-        // Entre 50-100%: se aplica destination-out (borrado)
         const prog = scratchProgress.current;
 
         if (prog < 0.5 && mid && fg) {
-          // Redibuja Doom ojos abiertos, luego fundimos encima el de ojos cerrados
-          // Nota: el borrado con destination-out ya borró algo — sólo pintamos la zona
-          // de ojos cerrados por encima con alpha proporcional
-          const alpha = prog / 0.5;  // 0..1 conforme avanza la primera mitad
+          const alpha = prog / 0.5;
           scratchCtx.globalCompositeOperation = 'source-over';
           scratchCtx.globalAlpha = alpha;
           const t = getTransform(mid.width, mid.height, rect.width, rect.height, mobile);
@@ -443,44 +450,55 @@ export default function ScratchReveal({
           scratchCtx.globalAlpha = 1;
         }
 
-        // Borrado del scratchCanvas (siempre activo)
         drawBrush(scratchCtx, state, brushSize);
 
-        const n = Math.max(0, Math.floor(state.speed / 4));
-        if (n > 0 || Math.random() > 0.55) {
-          particleSystem.current.emit(state.x, state.y, state.speed, n || 1);
+        // Partículas reducidas para rendimiento
+        const n = Math.max(0, Math.floor(state.speed / 6));
+        if (n > 0 || Math.random() > 0.7) {
+          particleSystem.current.emit(state.x, state.y, state.speed, Math.min(n || 1, 3));
         }
-        // marcar que el usuario ha interactuado (evita reveals automáticos)
         if (dist > 2) userInteractedRef.current = true;
+        needsRedraw = true;
       }
 
-      // ── 2. Redibujar columnas laterales animadas en bgCanvas ───────────────
+      // ── 2. Redibujar columnas laterales animadas (throttle ~30fps) ──────
       const bgCtx = bgCanvasRef.current?.getContext('2d', { alpha: false });
-      if (bgCtx && imgsRef.current.bg) {
-        const bg = imgsRef.current.bg;
-        bgCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      if (bgCtx && imgsRef.current.bg && needsRedraw) {
+        const shouldDrawCols = !mobile && (time - lastColDraw > COL_THROTTLE);
+        if (shouldDrawCols || drawing) {
+          lastColDraw = time;
+          const bg = imgsRef.current.bg;
+          bgCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-        // Fondo plano primero
-        bgCtx.fillStyle = isRevealedRef.current ? '#1a0505' : '#030a03';
-        bgCtx.fillRect(0, 0, rect.width, rect.height);
+          bgCtx.fillStyle = isRevealedRef.current ? '#1a0505' : '#030a03';
+          bgCtx.fillRect(0, 0, rect.width, rect.height);
 
-        // Imagen de Tony
-        const t = getTransform(bg.width, bg.height, rect.width, rect.height, mobile);
-        bgCtx.drawImage(bg, t.x, t.y, bg.width * t.scale, bg.height * t.scale);
+          const t = getTransform(bg.width, bg.height, rect.width, rect.height, mobile);
+          bgCtx.drawImage(bg, t.x, t.y, bg.width * t.scale, bg.height * t.scale);
 
-        // Columnas laterales (solo en PC donde hay espacio)
-        if (!mobile) {
-          const b = imgBoundsRef.current;
-          drawSideColumns(bgCtx, rect.width, rect.height, b.x, b.right, isRevealedRef.current, elapsed, avgColorRef.current);
+          if (!mobile) {
+            const b = imgBoundsRef.current;
+            drawSideColumns(bgCtx, rect.width, rect.height, b.x, b.right, isRevealedRef.current, elapsed, avgColorRef.current);
+          }
         }
       }
 
       // ── 3. Partículas ──────────────────────────────────────────────────────
-      particleSystem.current.updateAndDraw(particlesCtx, dt);
+      if (hasParticles || drawing) {
+        particleSystem.current.updateAndDraw(particlesCtx, dt);
+      } else if (needsRedraw) {
+        // limpiar canvas de partículas si no hay actividad
+        particlesCtx.clearRect(0, 0, particlesCanvas.width, particlesCanvas.height);
+      }
 
       if (state.isDrawing) {
         state.lastX = state.x;
         state.lastY = state.y;
+      }
+
+      // Reset flag si no hay actividad
+      if (!drawing && !hasParticles) {
+        needsRedraw = false;
       }
 
       rafId.current = requestAnimationFrame(renderLoop);
