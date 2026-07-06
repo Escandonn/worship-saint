@@ -3,7 +3,6 @@ import { usePointer } from './usePointer';
 import { drawBrush } from './Brush';
 import { ParticleSystem } from './Particles';
 import TypewriterText from './TypewriterText';
-import AIServiceCard from './AIServiceCard';
 
 interface ScratchRevealProps {
   foreground: string;       // Doom ojos abiertos
@@ -139,12 +138,18 @@ export default function ScratchReveal({
   const scratchProgress = useRef(0);       // 0 = Doom abierto, 1 = Tony
   const isRevealedRef   = useRef(false);
   const [isRevealed, setIsRevealed] = useState(false);
-  const [showNextOverlay, setShowNextOverlay] = useState(false);
-  const [showSecretOverlay, setShowSecretOverlay] = useState(false);
-  const [secretOverlayShownOnce, setSecretOverlayShownOnce] = useState(false);
-  const [showAIService, setShowAIService] = useState(false);
+  // ── Fases sincrónicas: una sola cosa a la vez ──
+  // 0 = texto inicial "Rasca la imagen"
+  // 1 = usuario rasca (scratch activo)
+  // 2 = texto de marketing (typewriter)
+  // 3 = transición final programática
+  // 4 = completo (imagen final visible)
+  const [phase, setPhase] = useState(0);
+  const [showHint, setShowHint] = useState(true);
+  const [showMarketing, setShowMarketing] = useState(false);
   const [textComplete, setTextComplete] = useState(false);
   const [finalApplied, setFinalApplied] = useState(false);
+  const [skipped, setSkipped] = useState(false);
   const timersRef = useRef<number[]>([]);
   const finalBgAppliedRef = useRef(false);
   const userInteractedRef = useRef(false);
@@ -166,39 +171,42 @@ export default function ScratchReveal({
     };
   }, []);
 
-  // Secuencia de overlays al completarse la revelación:
-  // 1) mostrar overlay central (Arioman) breve
-  // 2) mostrar overlay de marketing (Typewriter)
-  // 3) ocultar overlay de marketing automáticamente (fallback)
+  // ── Fase 0: texto inicial "Rasca la imagen" → desaparece solo ──
   useEffect(() => {
-    // limpiar timers previos
+    if (phase !== 0) return;
+    const t = window.setTimeout(() => {
+      setShowHint(false);
+      setPhase(1); // pasa a fase de rascado
+    }, 2600);
+    timersRef.current.push(t);
+    return () => { window.clearTimeout(t); };
+  }, [phase]);
+
+  // ── SKIP: salta toda la experiencia a la imagen final ──
+  const handleSkip = () => {
+    if (skipped) return;
+    setSkipped(true);
     timersRef.current.forEach(id => window.clearTimeout(id));
     timersRef.current = [];
+    setShowHint(false);
+    setShowMarketing(false);
+    // forzar reveal + transición final
+    scratchProgress.current = 1;
+    isRevealedRef.current = true;
+    setIsRevealed(true);
+    setPhase(3);
+    setTextComplete(true);
+    userInteractedRef.current = true;
+  };
 
-    if (!isRevealed) return;
-
-    setTextComplete(false);
-    setShowNextOverlay(false);
-    setShowSecretOverlay(false);
-    setShowAIService(false);
-    setSecretOverlayShownOnce(false);
-
-    // Mostrar el overlay de marketing tras un breve retardo (sin el título central)
-    const t1 = window.setTimeout(() => {
-      setShowNextOverlay(true);
-
-      // Fallback: ocultar el overlay de marketing si no se cierra por Typewriter
-      const t2 = window.setTimeout(() => setShowNextOverlay(false), 9000);
-      timersRef.current.push(t2);
-    }, 600);
-
-    timersRef.current.push(t1);
-
-    return () => {
-      timersRef.current.forEach(id => window.clearTimeout(id));
-      timersRef.current = [];
-    };
-  }, [isRevealed]);
+  // ── Fase 2: al revelarse Tony, mostrar texto de marketing (sincrónico) ──
+  useEffect(() => {
+    if (!isRevealed || skipped) return;
+    setPhase(2);
+    const t = window.setTimeout(() => setShowMarketing(true), 400);
+    timersRef.current.push(t);
+    return () => { window.clearTimeout(t); };
+  }, [isRevealed, skipped]);
 
   useEffect(() => {
     if (!textComplete || !afterReveal) return;
@@ -271,12 +279,6 @@ export default function ScratchReveal({
     newBg.src = afterReveal;
   }, [textComplete, afterReveal]);
 
-  useEffect(() => {
-    if (textComplete && finalApplied && !secretOverlayShownOnce) {
-      setShowSecretOverlay(true);
-      setSecretOverlayShownOnce(true);
-    }
-  }, [textComplete, finalApplied, secretOverlayShownOnce]);
   const imgsRef = useRef<{
     bg: HTMLImageElement | null;
     fg: HTMLImageElement | null;
@@ -511,29 +513,63 @@ export default function ScratchReveal({
       className="absolute inset-0 w-full h-full overflow-hidden touch-none"
       style={{ touchAction: 'none', background: 'transparent' }}
     >
-      {showNextOverlay && (
+      {/* ── Fase 0: Texto inicial centrado "Rasca la imagen" ── */}
+      {showHint && phase === 0 && (
         <div style={{
-          position: 'absolute', top: '16%', right: '4%', zIndex: 54,
-          display: 'flex', alignItems: 'flex-start', justifyContent: 'flex-end',
-          pointerEvents: 'none', width: mobileHeader ? '86vw' : '32vw',
-          maxWidth: '420px',
+          position: 'absolute', inset: 0, zIndex: 54,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          pointerEvents: 'none', padding: '1rem',
         }}>
           <div style={{
-            width: '100%', padding: '1rem 1.2rem',
-            background: 'rgba(5, 12, 18, 0.88)',
+            padding: mobileHeader ? '0.9rem 1.4rem' : '1.1rem 1.8rem',
+            background: 'rgba(3, 10, 3, 0.82)',
             border: `1px solid ${accentColor}`,
-            borderRadius: '24px',
-            boxShadow: '0 24px 90px rgba(0,0,0,0.55)',
+            borderRadius: '18px',
+            boxShadow: `0 18px 60px rgba(0,0,0,0.55), 0 0 24px ${isRevealed ? 'rgba(212,175,55,0.25)' : 'rgba(0,255,136,0.18)'}`,
+            backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)',
+            animation: 'hintPulse 2.4s ease-in-out infinite',
+          }}>
+            <span style={{
+              fontFamily: "'Cinzel', serif",
+              fontSize: mobileHeader ? '1.05rem' : '1.25rem',
+              fontWeight: 700,
+              letterSpacing: '0.18em',
+              textTransform: 'uppercase',
+              color: textColor,
+              textShadow: `0 2px 12px ${isRevealed ? 'rgba(212,175,55,0.4)' : 'rgba(0,255,136,0.35)'}`,
+            }}>
+              Rasca la imagen
+            </span>
+          </div>
+          <style>{`@keyframes hintPulse { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(1.04);opacity:0.92} }`}</style>
+        </div>
+      )}
+
+      {/* ── Fase 2: Texto de marketing (sincrónico, centrado) ── */}
+      {showMarketing && phase === 2 && !textComplete && (
+        <div style={{
+          position: 'absolute', inset: 0, zIndex: 54,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          pointerEvents: 'none', padding: '1rem',
+        }}>
+          <div style={{
+            width: mobileHeader ? '90vw' : 'min(560px, 50vw)',
+            padding: mobileHeader ? '1.1rem 1.3rem' : '1.4rem 1.8rem',
+            background: 'rgba(26, 5, 5, 0.88)',
+            border: `1px solid ${accentColor}`,
+            borderRadius: '22px',
+            boxShadow: '0 28px 90px rgba(0,0,0,0.6), 0 0 32px rgba(212,175,55,0.2)',
             backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)',
           }}>
-                  <TypewriterText
-              text="Hora de descubrir la verdad: desliza y revela quién está detrás de la máscara."
-              speed={80}
-              readDelay={8000}
+            <TypewriterText
+              text="El mismo actor de Iron Man será Doctor Doom. Toca y descubre quién hay detrás."
+              speed={45}
+              readDelay={4000}
               onComplete={() => {
-                if (!textComplete && showNextOverlay) {
+                if (!textComplete) {
                   setTextComplete(true);
-                  setShowNextOverlay(false);
+                  setShowMarketing(false);
+                  setPhase(3);
                 }
               }}
               className="marketing-reveal"
@@ -543,76 +579,54 @@ export default function ScratchReveal({
                 minHeight: 'auto',
                 margin: 0,
                 fontFamily: "'Cinzel', serif",
-                fontSize: mobileHeader ? '0.95rem' : '1.05rem',
+                fontSize: mobileHeader ? '0.95rem' : '1.1rem',
                 fontWeight: 700,
-                letterSpacing: '0.12em',
-                textAlign: 'left',
+                letterSpacing: '0.1em',
+                textAlign: 'center',
                 background: 'transparent',
                 padding: 0,
                 border: 'none',
                 boxShadow: 'none',
-                color: '#f5f5f5',
+                color: '#F5E2A0',
               }}
             />
           </div>
         </div>
       )}
 
-      {showSecretOverlay && (
-        <div style={{
-          position: 'absolute',
-          top: mobileHeader ? '1.8rem' : 'auto',
-          bottom: mobileHeader ? 'auto' : '3rem',
-          left: '50%', zIndex: 54,
-          transform: 'translateX(-50%)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          pointerEvents: 'none', width: mobileHeader ? '92vw' : '34vw',
-          maxWidth: mobileHeader ? '360px' : '420px',
-        }}>
-          <div style={{
-            width: '100%', padding: mobileHeader ? '0.9rem 1rem' : '1rem 1.2rem',
-            background: mobileHeader ? 'rgba(7, 12, 28, 0.9)' : 'rgba(17, 14, 38, 0.95)',
-            border: mobileHeader ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(255, 140, 45, 0.85)',
-            borderRadius: '22px',
-            boxShadow: mobileHeader ? '0 18px 44px rgba(0,0,0,0.35)' : '0 36px 110px rgba(170, 50, 20, 0.45)',
-            backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)',
-          }}>
-            <TypewriterText
-              text="Ahora que ya lo sabes, guarda nuestro secreto y únete a nosotros."
-              speed={72}
-              readDelay={5200}
-              autoHide={false}
-              onComplete={() => {
-                const timer = window.setTimeout(() => {
-                  setShowAIService(true);
-                }, 1400);
-                timersRef.current.push(timer);
-                const hideTimer = window.setTimeout(() => {
-                  setShowSecretOverlay(false);
-                }, 7000);
-                timersRef.current.push(hideTimer);
-              }}
-              className="secret-box"
-              style={{
-                position: 'static',
-                width: '100%',
-                minHeight: 'auto',
-                margin: 0,
-                fontFamily: "'Cinzel', serif",
-                fontSize: mobileHeader ? '0.9rem' : '1rem',
-                fontWeight: 700,
-                letterSpacing: '0.14em',
-                padding: 0,
-                border: 'none',
-                boxShadow: 'none',
-                color: '#ffffff',
-              }}
-            />
-          </div>
-        </div>
+      {/* ── SKIP button (siempre visible hasta completar) ── */}
+      {!finalApplied && (
+        <button
+          type="button"
+          onClick={handleSkip}
+          aria-label="Saltar experiencia"
+          style={{
+            position: 'absolute',
+            bottom: mobileHeader ? '1.2rem' : '1.6rem',
+            right: mobileHeader ? '1.2rem' : '1.6rem',
+            zIndex: 60,
+            display: 'inline-flex', alignItems: 'center', gap: '0.5rem',
+            padding: mobileHeader ? '0.6rem 1rem' : '0.7rem 1.2rem',
+            fontFamily: "'Cinzel', serif",
+            fontSize: mobileHeader ? '0.72rem' : '0.78rem',
+            fontWeight: 700,
+            letterSpacing: '0.18em',
+            textTransform: 'uppercase',
+            color: textColor,
+            background: 'rgba(0, 0, 0, 0.6)',
+            border: `1px solid ${accentColor}`,
+            borderRadius: '999px',
+            cursor: 'pointer',
+            backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)',
+            boxShadow: `0 6px 24px rgba(0,0,0,0.4)`,
+            transition: 'transform 0.2s ease, background 0.2s ease',
+          }}
+          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(1.05)'; (e.currentTarget as HTMLElement).style.background = 'rgba(0,0,0,0.8)'; }}
+          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(1)'; (e.currentTarget as HTMLElement).style.background = 'rgba(0,0,0,0.6)'; }}
+        >
+          Saltar ✕
+        </button>
       )}
-
-      {showAIService && <AIServiceCard />}
 
       {/* ── HEADER ── */}
       

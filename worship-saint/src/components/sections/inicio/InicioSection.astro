@@ -1,14 +1,10 @@
 ---
-import NavBar from "../../NavBar";
 import ScratchReveal from "../../ScratchReveal";
-import TypewriterText from "../../TypewriterText";
 
 import doctorDoom from "../../../assets/doctor-doom.jpg";
 import doctorDoomClosed from "../../../assets/doctor-doom-ojos-cerrados.jpg";
 import tony from "../../../assets/tony.jpg";
 import rostroVerdadero from "../../../assets/rostro-verdadero.jpg";
-
-const marketingCopy = "¿Sabías que el mismo actor de Iron Man interpretará al temible Doctor Doom? Toca toda la imagen y descubre quién es... Dos polos opuestos: El héroe que salvó al universo frente al villano que buscará conquistarlo.";
 ---
 
 <section id="inicio" class="hero-section">
@@ -20,32 +16,6 @@ const marketingCopy = "¿Sabías que el mismo actor de Iron Man interpretará al
       background={tony.src}
       afterReveal={rostroVerdadero.src}
       brushSize={140}
-    />
-  </div>
-
-  <div class="hero-copy">
-    <TypewriterText
-      client:load
-      text="Doctor Doom vs Iron Man"
-      speed={55}
-      readDelay={999999}
-      className="hero-title"
-      style={{ position: 'static', width: '100%', minHeight: 'auto', opacity: 1 }}
-    />
-
-    <div class="hero-headings" aria-hidden="true">
-      <span>Inicio</span>
-      <span>Servicios</span>
-      <span>Nuestras obras</span>
-      <span>Quiénes somos</span>
-    </div>
-
-    <TypewriterText
-      client:load
-      text={marketingCopy}
-      speed={38}
-      readDelay={7000}
-      className="hero-copy-text"
     />
   </div>
 </section>
