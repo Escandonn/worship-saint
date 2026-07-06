@@ -1,125 +1,125 @@
-# Contexto del proyecto Worship-Saint
+# CONTEXT.md — Worship-Saint
 
-## Resumen general
-Worship-Saint es un sitio web interactivo desarrollado con Astro y componentes React para ofrecer una experiencia de hero visual y narrativa. El centro del proyecto es un efecto de scratch reveal que permite al usuario descubrir una imagen oculta al rascar una capa superior, con una secuencia de overlays, texto tipo máquina de escribir y una transición final hacia una imagen distinta.
+> Documento de contexto técnico para IAs y desarrolladores. Léelo completo antes de modificar el hero.
 
-Este documento sirve como contexto operativo para futuras IAs, desarrolladores o colaboradores. Resume qué hace el proyecto, cómo está estructurado, qué cambios ya se implementaron y cómo probar la experiencia completa.
+## Qué es este proyecto
+Landing page con un **hero interactivo de scratch reveal**. El usuario rasca una capa (Doctor Doom) para descubrir otra imagen (Tony Stark), ve un mensaje de marketing, y finalmente se revela una tercera imagen (rostro verdadero) con una transición animada. Todo sincrónico: **una sola cosa a la vez**.
 
-## Objetivo del producto
-- Crear un hero impactante y memorable para la marca.
-- Usar interacción física (rascar) como elemento central de la experiencia.
-- Guiar al usuario a través de una secuencia narrativa progresiva: imagen inicial → overlay intermedio → mensaje de marketing → imagen final.
-- Mantener la experiencia visual consistente, responsive y con transiciones suaves.
+## Stack
+- **Astro** (páginas) + **React** (componentes interactivos) + **TypeScript**
+- **Canvas 2D** para scratch, partículas y columnas laterales animadas
+- **Tailwind** vía Astro/Vite para estilos base
+- Sin frameworks de animación; se usa `requestAnimationFrame` + `setInterval` + CSS
 
-## Stack técnico
-- Astro como framework principal para la estructura de páginas y contenido.
-- React para los componentes interactivos del hero.
-- TypeScript para tipado de componentes y lógica de UI.
-- Canvas 2D para el efecto scratch reveal y para las animaciones visuales.
-- Tailwind CSS vía Astro / Vite para estilos base y utilidades.
+## Estructura de archivos clave
+```
+src/
+├── pages/index.astro                          # entrada, monta InicioSection
+├── components/
+│   ├── ScratchReveal.tsx                      # ⭐ componente principal del hero
+│   ├── TypewriterText.tsx                     # texto tipo máquina de escribir
+│   ├── Brush.ts                               # trazo destination-out (borrado)
+│   ├── usePointer.ts                          # estado del puntero (drag real vs hover)
+│   ├── Particles.ts                           # sistema de partículas del scratch
+│   └── sections/inicio/InicioSection.astro    # composición del hero, pasa imágenes
+├── assets/
+│   ├── doctor-doom.jpg                        # foreground (capa superior, se raspa)
+│   ├── doctor-doom-ojos-cerrados.jpg          # midground (transición 0-50%)
+│   ├── tony.jpg                               # background (se revela al rascar)
+│   └── rostro-verdadero.jpg                   # afterReveal (imagen final)
+└── styles/global.css                          # tailwind + body bg #000
+```
 
-## Estructura del proyecto
-- [README.md](README.md) — resumen general del proyecto y comandos de uso.
-- [package.json](package.json) — dependencias, scripts y versión del proyecto.
-- [src/pages/index.astro](src/pages/index.astro) — punto de entrada de la página principal.
-- [src/components/ScratchReveal.tsx](src/components/ScratchReveal.tsx) — componente principal del efecto scratch reveal y secuencia visual.
-- [src/components/TypewriterText.tsx](src/components/TypewriterText.tsx) — animación de texto tipo máquina de escribir con callbacks de finalización.
-- [src/components/Brush.ts](src/components/Brush.ts) — lógica de trazos para el efecto de borrar/rascar sobre canvas.
-- [src/components/usePointer.ts](src/components/usePointer.ts) — manejo del puntero para distinguir arrastre real de simples movimientos.
-- [src/components/sections/inicio/InicioSection.astro](src/components/sections/inicio/InicioSection.astro) — composición del hero y paso de imágenes/props al componente principal.
-- [src/components/NavBar.tsx](src/components/NavBar.tsx) — navegación principal del sitio.
-- [src/components/sections](src/components/sections) — secciones de contenido del landing.
-- [src/assets](src/assets) — imágenes del proyecto, entre ellas doctor-doom.jpg, doctor-doom-ojos-cerrados.jpg, tony.jpg y rostro-verdadero.jpg.
+## Flujo de fases (sincrónico, una a la vez)
+El componente `ScratchReveal` usa un estado `phase` (0-4) que controla toda la secuencia:
 
-## Estado actual del desarrollo
-El proyecto ya cuenta con una implementación funcional del hero interactivo y con una secuencia de narrativa completa. La experiencia actual está enfocada en el siguiente flujo:
+| Fase | Estado | Qué pasa | Duración |
+|------|--------|----------|----------|
+| 0 | `showHint` | Texto central "Rasca la imagen" con pulso | 2600ms → desaparece |
+| 1 | scratch activo | Usuario rasca; `scratchProgress` 0→1 | hasta que progreso = 1 |
+| 2 | `showMarketing` | Typewriter escribe mensaje de marketing | ~texto + 1800ms post-complete |
+| 3 | transición final | Scratch programático revela `afterReveal` | 4200ms |
+| 4 | `finalApplied` | Imagen final visible, experiencia completa | — |
 
-1. El usuario rasca una imagen con clic/arrastre.
-2. El sistema mide el progreso del rascado y, al completarlo, activa la siguiente fase.
-3. Se muestra un overlay intermedio visual y luego un overlay de marketing con texto.
-4. Cuando el texto termina de escribirse, se dispara la transición final que revela una imagen nueva con un efecto de rascar programático.
+**SKIP**: botón abajo-derecha (zIndex 60) que fuerza `phase=3`, `scratchProgress=1`, `isRevealed=true` y salta todo.
 
-## Cambios implementados hasta el momento
+## Sistema de canvas (3 capas)
+`ScratchReveal` maneja 3 canvases apilados:
 
-### 1. Scratch reveal robusto y controlado
-Se reworked el componente principal para que la experiencia sea más estable y menos propensa a replays o repeticiones no deseadas.
+1. **bgCanvasRef** — Tony (fondo fijo) + columnas laterales animadas (solo PC)
+   - `drawSideColumns()`: gradientes rojo/dorado post-reveal, verde pre-reveal
+   - Throttle ~30fps para columnas; solo redibuja cuando hay actividad
+2. **scratchCanvasRef** — Doctor Doom (se borra con `destination-out`)
+   - `drawBrush()` de `Brush.ts` hace el borrado con gradiente radial soft-edge
+   - Entre 0-50% del progreso se superpone `midground` (ojos cerrados) con alpha creciente
+3. **particlesCanvasRef** — partículas del scratch
+   - `ParticleSystem` de `Particles.ts`; emite según velocidad del puntero
+   - Early-return si no hay partículas (optimización INP)
 
-Implementado en [src/components/ScratchReveal.tsx](src/components/ScratchReveal.tsx):
-- Se agregó una secuencia de estados para controlar overlays y transiciones.
-- Se incorporó lógica para evitar que la secuencia se dispare más de una vez.
-- Se añadió control de interacción real del usuario para evitar reveals automáticos.
-- Se implementó una transición final programática que revela la imagen final mediante trazos sintéticos sobre el canvas.
-- Se agregó limpieza de timers y requestAnimationFrame al desmontar o reiniciar la secuencia.
-- Se evitó volver a dibujar el foreground una vez que la imagen final ya fue aplicada.
+## Optimizaciones de rendimiento (INP)
+El render loop (`renderLoop` en ScratchReveal) está optimizado para no redibujar en idle:
+- **Skip en idle**: si no hay dibujo, partículas ni necesidad de redraw, el frame se salta
+- **Throttle de columnas**: ~30fps (33ms) en vez de 60fps
+- **Partículas reducidas**: `speed/6`, máx 3 por emisión, probabilidad 0.7
+- **`Particles.updateAndDraw`**: early-return si `particles.length === 0`, usa `clientWidth/clientHeight`
+- **Clear condicional** del canvas de partículas
 
-### 2. Secuencia de overlays narrativos
-El flujo visual ahora sigue una estructura clara:
-- Se activa el overlay central con la imagen de Arioman / personaje principal.
-- Luego aparece un overlay de marketing en la esquina superior derecha.
-- El texto de marketing se escribe tipo máquina de escribir.
-- Al completarse el texto, se inicia la transición final.
+## Paleta de colores
+**Pre-reveal (verde Doom):**
+- Fondo: `#030a03` · Columnas: `#0a2a2a` / `#2a6a2a` · Accent: `#00ff88`
 
-### 3. Texto tipo máquina de escribir con callback de finalización
-Implementado en [src/components/TypewriterText.tsx](src/components/TypewriterText.tsx):
-- Se corrigió la lógica de escritura para evitar comportamientos extra o errores.
-- Se añadió callback onComplete para notificar cuando terminó el texto.
-- Se incorporó un fade-out controlado con readDelay para ocultar el mensaje tras un tiempo.
-- Se hizo el callback idempotente para evitar múltiples ejecuciones.
+**Post-reveal (rojo/dorado Iron Man):**
+- Fondo: `#3a0808` · Columnas: `#5C0000` / `#D4AF37` · Accent: `#FFD700`
+- Overlay dorado con shimmer animado (opacidad 0.12 + pulse)
 
-### 4. Lógica de Pointer más precisa
-Implementado en [src/components/usePointer.ts](src/components/usePointer.ts):
-- El estado del puntero solo se actualiza cuando hay un dibujo real en curso.
-- Se reducen falsos positivos por movimientos del cursor sin arrastre.
-- El sistema distingue mejor entre interacción válida y simple hover.
+## Tipografía
+- **Cinzel** (serif) — títulos, labels, hint, marketing, skip
+- **Lora** (serif italic) — texto del typewriter
 
-### 5. Pincel y efecto de borrado reutilizable
-Implementado en [src/components/Brush.ts](src/components/Brush.ts):
-- El brush usa composite operation destination-out para borrar la capa superior y dejar ver la imagen inferior.
-- Se usa un gradiente radial para lograr bordes suaves.
-- La misma lógica se reutiliza tanto para el scratch normal como para la animación final programática.
+## Props de ScratchReveal
+```tsx
+<ScratchReveal
+  foreground={doctorDoom.src}        // capa superior (se raspa)
+  midground={doctorDoomClosed.src}   // transición ojos (0-50% progreso)
+  background={tony.src}              // imagen revelada al rascar
+  afterReveal={rostroVerdadero.src} // imagen final (transición programática)
+  brushSize={140}                    // tamaño del pincel
+/>
+```
 
-### 6. Integración del hero con imagen final
-Implementado en [src/components/sections/inicio/InicioSection.astro](src/components/sections/inicio/InicioSection.astro):
-- Se pasa la prop afterReveal con la imagen final a ScratchReveal.
-- Esto permite cargar la imagen final solo cuando corresponde al final del flujo narrativo.
+## Parámetros ajustables (ubicaciones exactas)
+| Parámetro | Archivo | Qué buscar |
+|-----------|---------|------------|
+| Duración hint inicial | `ScratchReveal.tsx` | `setTimeout(..., 2600)` en fase 0 |
+| Sensibilidad scratch | `ScratchReveal.tsx` | `dist / 4500` (divisor mayor = más lento) |
+| Delay marketing | `ScratchReveal.tsx` | `setTimeout(() => setShowMarketing(true), 400)` |
+| Speed typewriter | `ScratchReveal.tsx` | `speed={42}` en TypewriterText |
+| Read delay typewriter | `ScratchReveal.tsx` | `readDelay={6500}` |
+| Delay post-complete | `ScratchReveal.tsx` | `setTimeout(..., 1800)` en onComplete |
+| Duración transición final | `ScratchReveal.tsx` | `const duration = 4200` |
+| Tamaño pincel | `InicioSection.astro` | `brushSize={140}` |
+| Colores columnas | `ScratchReveal.tsx` | `drawSideColumns()` líneas ~30-40 |
+| Throttle columnas | `ScratchReveal.tsx` | `COL_THROTTLE = 33` |
 
-## Flujo de interacción actual
-1. El usuario realiza un trazo con clic y arrastre.
-2. El sistema acumula progreso de rascado según la distancia recorrida.
-3. Al alcanzar el 100% y si la interacción fue real, se activa la secuencia de revelado.
-4. Primero aparece un overlay intermedio visual.
-5. Después aparece el mensaje persuasivo con escritura gradual.
-6. Cuando el texto termina, se inicia la transición final para mostrar la imagen nueva.
+## Cómo probar
+```bash
+cd worship-saint
+npm install
+npm run dev
+# → http://localhost:4321
+```
+Interactuar: clic + arrastrar para rascar. Botón "Saltar" abajo-derecha para skip.
 
-## Cómo probar la experiencia
-1. Instalar dependencias:
-   ```bash
-   cd c:\Users\ADMINSTRADOR\Documents\worship-saint\worship-saint
-   npm install
-   ```
-2. Iniciar el servidor de desarrollo:
-   ```bash
-   npm run dev
-   ```
-3. Abrir en el navegador:
-   ```text
-   http://localhost:4321
-   ```
-4. Interactuar con el hero:
-   - Rascar con clic + arrastrar.
-   - Ver la secuencia: overlay intermedio → mensaje de marketing → transición final.
+## Reglas críticas para modificaciones
+1. **No redibujar en idle** — el render loop debe respetar el flag `needsRedraw` y los early-returns
+2. **Una fase a la vez** — no mostrar hint + marketing + scratch simultáneamente
+3. **`userInteractedRef`** debe ser true antes de revelar (evita reveals automáticos por hover)
+4. **Limpiar timers** en `handleSkip` y en cleanup de effects (`timersRef.current`)
+5. **`finalRevealRunningRef`** previene que la transición final se dispare dos veces
+6. **`finalBgAppliedRef`** evita redibujar el foreground tras aplicar la imagen final
+7. **DPR** — los canvases usan `devicePixelRatio`; respetar `setTransform(dpr,...)` al dibujar
+8. **Móvil** — sin columnas laterales (`if (!mobile)`); hint/marketing usan `mobileHeader`
 
-## Parámetros ajustables
-- Sensibilidad de scratch: ajustar el divisor utilizado para calcular progreso en [src/components/ScratchReveal.tsx](src/components/ScratchReveal.tsx).
-- Duración de la animación final: cambiar la variable de duración en la transición programática.
-- Velocidad del typewriter: ajustar speed y readDelay en [src/components/TypewriterText.tsx](src/components/TypewriterText.tsx).
-- Tamaño del pincel: modificar brushSize al pasar la prop desde [src/components/sections/inicio/InicioSection.astro](src/components/sections/inicio/InicioSection.astro).
-
-## Notas importantes para futuras modificaciones
-- Si la secuencia se repite más de una vez, revisar que el componente no esté montándose dos veces por hidratación o duplicación de layout.
-- La lógica actual ya intenta prevenir replays, pero un montaje extra puede volver a disparar la experiencia.
-- Para una transición final más direccional o más “barrido”, se puede modificar la generación de coordenadas en la animación programática.
-- El proyecto está orientado a mantener el hero como un componente principal y modular, por lo que cualquier cambio visual nuevo debería respetar esa estructura.
-
-## Resumen ejecutivo para IA
-Este proyecto es un landing page con un hero interactivo muy específico: un scratch reveal que combina canvas, overlays, texto tipo máquina de escribir y transición final hacia una imagen distinta. El estado actual ya está funcional y representa un flujo completo de experiencia visual. El componente central es ScratchReveal, mientras que TypewriterText, Brush y usePointer son los módulos auxiliares para la interacción y la narrativa.
+## Estado actual
+✅ Funcional: fases sincrónicas, skip, hint, marketing, transición final, columnas rojo-dorado, optimización INP
+🔄 Pendiente: validar INP tras optimizaciones (<304ms objetivo)
