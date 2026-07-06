@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import TypewriterText from './TypewriterText';
 import { iaServiceConfig, getAISummary } from '../services/ai/aiService';
+import bill from '../assets/bill.jpg';
+import emogin from '../assets/emogin.jpg';
 
 const AIServiceCard: React.FC = () => {
   const [stage, setStage] = useState<'intro' | 'min'>('intro');
@@ -56,7 +58,7 @@ const AIServiceCard: React.FC = () => {
           opacity: entered ? 1 : 0,
         }}
         onClick={() => setChatOpen(open => !open)}>
-          <img src="/src/assets/emogin.png" alt="emogin" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center center' }} />
+          <img src={emogin.src} alt="emogin" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center center' }} />
         </div>
         <div style={{
           position: 'fixed', right: '1.1rem', bottom: '5.15rem', zIndex: 61,
@@ -92,7 +94,7 @@ const AIServiceCard: React.FC = () => {
         opacity: entered ? 1 : 0,
         transition: 'transform 0.5s ease, opacity 0.5s ease'
       }}>
-        <img src="/src/assets/bill.png" alt="Bill" style={{
+        <img src={bill.src} alt="Bill" style={{
           width: '100%', height: imageHeight,
           objectFit: 'contain', objectPosition: 'center top',
           display: 'block', background: 'transparent'
