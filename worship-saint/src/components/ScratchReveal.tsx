@@ -9,6 +9,8 @@ interface ScratchRevealProps {
   midground: string;        // Doom ojos cerrados (transición)
   background: string;       // Tony / Iron Man
   afterReveal?: string;     // opcional: imagen a mostrar después del texto de rostro
+  billImage?: string;       // Bill — aparece en esquina inferior derecha con nube de diálogo
+  emoginImage?: string;     // Emogin — aparece después de Bill con mensaje "listo para hablar"
   brushSize?: number;
 }
 
@@ -120,6 +122,8 @@ export default function ScratchReveal({
   midground,
   background,
   afterReveal,
+  billImage,
+  emoginImage,
   brushSize = 140,
 }: ScratchRevealProps) {
   const containerRef     = useRef<HTMLDivElement>(null);
@@ -149,6 +153,10 @@ export default function ScratchReveal({
   const [showMarketing, setShowMarketing] = useState(false);
   const [textComplete, setTextComplete] = useState(false);
   const [finalApplied, setFinalApplied] = useState(false);
+  const [showBill, setShowBill] = useState(false);
+  const [showBillBubble, setShowBillBubble] = useState(false);
+  const [showEmogin, setShowEmogin] = useState(false);
+  const [showEmoginBubble, setShowEmoginBubble] = useState(false);
   const [skipped, setSkipped] = useState(false);
   const timersRef = useRef<number[]>([]);
   const finalBgAppliedRef = useRef(false);
@@ -282,6 +290,21 @@ export default function ScratchReveal({
     };
     newBg.src = afterReveal;
   }, [textComplete, afterReveal]);
+
+  // ── Secuencia Bill + Emogin: aparece solo al final de la última imagen ──
+  useEffect(() => {
+    if (!finalApplied || !billImage) return;
+    // Bill aparece inmediatamente
+    const t1 = window.setTimeout(() => setShowBill(true), 300);
+    // Nube de diálogo de Bill tras aparecer
+    const t2 = window.setTimeout(() => setShowBillBubble(true), 1400);
+    // Emogin aparece después
+    const t3 = window.setTimeout(() => setShowEmogin(true), 4200);
+    // Nube de diálogo de Emogin
+    const t4 = window.setTimeout(() => setShowEmoginBubble(true), 5300);
+    timersRef.current.push(t1, t2, t3, t4);
+    return () => { [t1, t2, t3, t4].forEach(t => window.clearTimeout(t)); };
+  }, [finalApplied, billImage]);
 
   const imgsRef = useRef<{
     bg: HTMLImageElement | null;
@@ -820,6 +843,150 @@ export default function ScratchReveal({
       <canvas ref={particlesCanvasRef}
         style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', display: 'block', zIndex: 20, pointerEvents: 'none' }}
       />
+
+      {/* ── Bill (esquina inferior derecha) con nube de diálogo — zIndex 30 ── */}
+      {finalApplied && billImage && (
+        <>
+          <style>{`
+            @keyframes billSlideIn {
+              0% { transform: translateY(40px) scale(0.7); opacity: 0; }
+              60% { transform: translateY(-6px) scale(1.05); opacity: 1; }
+              100% { transform: translateY(0) scale(1); opacity: 1; }
+            }
+            @keyframes bubblePopIn {
+              0% { transform: scale(0.3) translateY(10px); opacity: 0; }
+              50% { transform: scale(1.08) translateY(-4px); opacity: 1; }
+              100% { transform: scale(1) translateY(0); opacity: 1; }
+            }
+            @keyframes bubbleFloat {
+              0%, 100% { transform: translateY(0); }
+              50% { transform: translateY(-4px); }
+            }
+          `}</style>
+
+          {/* Bill personaje */}
+          {showBill && (
+            <div style={{
+              position: 'absolute',
+              bottom: mobileHeader ? '0.5rem' : '1rem',
+              right: mobileHeader ? '0.5rem' : '1.5rem',
+              zIndex: 30,
+              width: mobileHeader ? '90px' : '130px',
+              height: mobileHeader ? '90px' : '130px',
+              animation: 'billSlideIn 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards',
+              pointerEvents: 'none',
+            }}>
+              <img
+                src={billImage}
+                alt="Bill"
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'contain',
+                  filter: 'drop-shadow(0 6px 20px rgba(0,0,0,0.5))',
+                }}
+              />
+            </div>
+          )}
+
+          {/* Nube de diálogo de Bill */}
+          {showBillBubble && !showEmogin && (
+            <div style={{
+              position: 'absolute',
+              bottom: mobileHeader ? '5rem' : '7.5rem',
+              right: mobileHeader ? '3.5rem' : '6rem',
+              zIndex: 31,
+              maxWidth: mobileHeader ? '200px' : '280px',
+              padding: mobileHeader ? '0.7rem 1rem' : '0.9rem 1.3rem',
+              background: 'rgba(255, 255, 255, 0.96)',
+              borderRadius: '18px',
+              boxShadow: '0 8px 30px rgba(0,0,0,0.35), 0 0 16px rgba(212,175,55,0.2)',
+              fontFamily: "'Cinzel', serif",
+              fontSize: mobileHeader ? '0.72rem' : '0.85rem',
+              fontWeight: 700,
+              color: '#3a0808',
+              lineHeight: 1.4,
+              animation: 'bubblePopIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards, bubbleFloat 3s ease-in-out 0.5s infinite',
+              pointerEvents: 'none',
+            }}>
+              <span style={{ color: '#5C0000', fontWeight: 800 }}>¡Hola! Soy Bill</span>
+              <br />
+              <span style={{ color: '#7a1010' }}>y soy la que te explicará todo</span>
+              {/* Cola de la nube */}
+              <div style={{
+                position: 'absolute',
+                bottom: '-10px',
+                right: mobileHeader ? '12px' : '20px',
+                width: '0',
+                height: '0',
+                borderLeft: '10px solid transparent',
+                borderRight: '10px solid transparent',
+                borderTop: '12px solid rgba(255, 255, 255, 0.96)',
+              }} />
+            </div>
+          )}
+
+          {/* Emogin personaje */}
+          {showEmogin && emoginImage && (
+            <div style={{
+              position: 'absolute',
+              bottom: mobileHeader ? '0.5rem' : '1rem',
+              right: mobileHeader ? '5rem' : '8rem',
+              zIndex: 30,
+              width: mobileHeader ? '70px' : '100px',
+              height: mobileHeader ? '70px' : '100px',
+              animation: 'billSlideIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards',
+              pointerEvents: 'none',
+            }}>
+              <img
+                src={emoginImage}
+                alt="Emogin"
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'contain',
+                  filter: 'drop-shadow(0 6px 20px rgba(0,0,0,0.5))',
+                }}
+              />
+            </div>
+          )}
+
+          {/* Nube de diálogo de Emogin */}
+          {showEmoginBubble && (
+            <div style={{
+              position: 'absolute',
+              bottom: mobileHeader ? '4rem' : '6rem',
+              right: mobileHeader ? '7rem' : '11rem',
+              zIndex: 31,
+              maxWidth: mobileHeader ? '160px' : '220px',
+              padding: mobileHeader ? '0.55rem 0.85rem' : '0.7rem 1.1rem',
+              background: 'rgba(255, 248, 220, 0.96)',
+              borderRadius: '16px',
+              boxShadow: '0 8px 30px rgba(0,0,0,0.35), 0 0 16px rgba(255,215,0,0.2)',
+              fontFamily: "'Cinzel', serif",
+              fontSize: mobileHeader ? '0.68rem' : '0.8rem',
+              fontWeight: 700,
+              color: '#3a0808',
+              lineHeight: 1.4,
+              animation: 'bubblePopIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards, bubbleFloat 3s ease-in-out 0.5s infinite',
+              pointerEvents: 'none',
+            }}>
+              <span style={{ color: '#5C0000', fontWeight: 800 }}>Listo para hablar</span>
+              {/* Cola de la nube */}
+              <div style={{
+                position: 'absolute',
+                bottom: '-10px',
+                right: mobileHeader ? '10px' : '18px',
+                width: '0',
+                height: '0',
+                borderLeft: '10px solid transparent',
+                borderRight: '10px solid transparent',
+                borderTop: '12px solid rgba(255, 248, 220, 0.96)',
+              }} />
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }
