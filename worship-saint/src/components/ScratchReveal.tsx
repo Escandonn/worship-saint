@@ -154,6 +154,7 @@ export default function ScratchReveal({
   const finalBgAppliedRef = useRef(false);
   const userInteractedRef = useRef(false);
   const finalRevealRunningRef = useRef(false);
+  const needsRedrawRef = useRef(true); // forzar redraw desde fuera del loop
   const [headerVisible, setHeaderVisible] = useState(false);
   const [mobileHeader, setMobileHeader] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -221,6 +222,7 @@ export default function ScratchReveal({
       if (!bgCanvas || !scratchCanvas) {
           imgsRef.current.bg = newBg;
           finalBgAppliedRef.current = true;
+          needsRedrawRef.current = true;
           try { initCanvasRef.current && initCanvasRef.current(); } catch (e) { /* noop */ }
           setFinalApplied(true);
           return;
@@ -228,6 +230,7 @@ export default function ScratchReveal({
 
       // Draw new background immediately underneath
       imgsRef.current.bg = newBg;
+      needsRedrawRef.current = true; // forzar redibujado de columnas
       try { initCanvasRef.current && initCanvasRef.current(); } catch (e) { /* noop */ }
 
       // Animate programmatic scratching to reveal the new bg
@@ -269,6 +272,7 @@ export default function ScratchReveal({
           // finish: ensure canvas is cleared (fully reveal)
           scratchCtx.clearRect(0, 0, scratchCanvas.width, scratchCanvas.height);
           finalBgAppliedRef.current = true;
+          needsRedrawRef.current = true; // forzar redibujado continuo de columnas
           setFinalApplied(true);
           finalRevealRunningRef.current = false;
         }
@@ -379,12 +383,18 @@ export default function ScratchReveal({
         };
       }
 
-      // Pintar fondo (Tony) — la 2ª imagen siempre visible debajo
-      bgCtx.fillStyle = '#030a03';
+      // Pintar fondo — color según fase (verde pre-reveal, rojo post-reveal)
+      bgCtx.fillStyle = isRevealedRef.current ? '#3a0808' : '#030a03';
       bgCtx.fillRect(0, 0, rect.width, rect.height);
       if (bg) {
         const t = getTransform(bg.width, bg.height, rect.width, rect.height, mobile);
         bgCtx.drawImage(bg, t.x, t.y, bg.width * t.scale, bg.height * t.scale);
+      }
+
+      // Dibujar columnas laterales también en initCanvas (para que estén siempre presentes)
+      if (!mobile && imgBoundsRef.current.right > 0) {
+        const b = imgBoundsRef.current;
+        drawSideColumns(bgCtx, rect.width, rect.height, b.x, b.right, isRevealedRef.current, performance.now() - startTime.current, avgColorRef.current);
       }
 
       // Si la imagen final ya se aplicó, no redibujamos el foreground (evita volver a cubrir)
@@ -406,7 +416,6 @@ export default function ScratchReveal({
     let needsRedraw = true;
     let lastColDraw = 0;
     const COL_THROTTLE = 33; // ~30fps para columnas animadas
-
     // ── RENDER LOOP ─────────────────────────────────────────────────────────
     const renderLoop = (time: number) => {
       const dt      = time - lastTime.current;
@@ -422,7 +431,8 @@ export default function ScratchReveal({
       const drawing = state.isDrawing && state.x !== null && state.y !== null && state.lastX !== null && state.lastY !== null;
 
       // Si no hay actividad, no redibujamos (ahorra CPU/GPU en idle)
-      if (!needsRedraw && !drawing && !hasParticles && mobile) {
+      // Pero si la imagen final está aplicada, seguimos redibujando columnas animadas
+      if (!needsRedraw && !needsRedrawRef.current && !drawing && !hasParticles && mobile) {
         rafId.current = requestAnimationFrame(renderLoop);
         return;
       }
@@ -463,9 +473,11 @@ export default function ScratchReveal({
 
       // ── 2. Redibujar columnas laterales animadas (throttle ~30fps) ──────
       const bgCtx = bgCanvasRef.current?.getContext('2d', { alpha: false });
-      if (bgCtx && imgsRef.current.bg && needsRedraw) {
+      // Si la imagen final está aplicada, forzar redibujado continuo de columnas (animación)
+      const forceCols = finalBgAppliedRef.current || needsRedrawRef.current;
+      if (bgCtx && imgsRef.current.bg && (needsRedraw || forceCols)) {
         const shouldDrawCols = !mobile && (time - lastColDraw > COL_THROTTLE);
-        if (shouldDrawCols || drawing) {
+        if (shouldDrawCols || drawing || forceCols) {
           lastColDraw = time;
           const bg = imgsRef.current.bg;
           bgCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -496,10 +508,11 @@ export default function ScratchReveal({
         state.lastY = state.y;
       }
 
-      // Reset flag si no hay actividad
-      if (!drawing && !hasParticles) {
+      // Reset flag si no hay actividad (pero no si la imagen final está aplicada)
+      if (!drawing && !hasParticles && !finalBgAppliedRef.current) {
         needsRedraw = false;
       }
+      needsRedrawRef.current = false; // consumir el flag externo
 
       rafId.current = requestAnimationFrame(renderLoop);
     };
