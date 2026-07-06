@@ -32,10 +32,10 @@ function drawSideColumns(
   const colW = Math.max(0, imgX); // ancho de cada columna lateral
   if (colW < 2) return;           // en móvil no hay espacio
 
-  // Colores temáticos (restaurados a valores originales)
-  const primary   = isRevealed ? '#8B0000' : '#0a2a0a';
+  // Colores temáticos — rojo/dorado más vivos post-reveal
+  const primary   = isRevealed ? '#5C0000' : '#0a2a0a';
   const secondary = isRevealed ? '#D4AF37' : '#2a6a2a';
-  const accent    = isRevealed ? '#FF4500' : '#00ff88';
+  const accent    = isRevealed ? '#FFD700' : '#00ff88';
 
   // vividez: animación de la superposición dorada será calculada más abajo
 
@@ -107,7 +107,7 @@ function drawSideColumns(
   overlay.addColorStop(0,   shimmerStart);
   overlay.addColorStop(0.5, shimmerEnd);
   overlay.addColorStop(1,   'transparent');
-  ctx.globalAlpha = 0.06 + 0.06 * Math.abs(Math.sin(t * 0.004));
+  ctx.globalAlpha = isRevealed ? (0.12 + 0.08 * Math.abs(Math.sin(t * 0.004))) : (0.06 + 0.06 * Math.abs(Math.sin(t * 0.004)));
   ctx.fillStyle = overlay;
   ctx.fillRect(0, 0, colW, h);
   ctx.fillRect(imgRight, 0, w - imgRight, h);
@@ -241,7 +241,7 @@ export default function ScratchReveal({
         return;
       }
 
-      const duration = 2600; // longer reveal animation for smoother transition
+      const duration = 4200; // transición final más lenta y cinematográfica
       const start = performance.now();
       let rafIdLocal: number;
 
@@ -470,7 +470,7 @@ export default function ScratchReveal({
           const bg = imgsRef.current.bg;
           bgCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-          bgCtx.fillStyle = isRevealedRef.current ? '#1a0505' : '#030a03';
+          bgCtx.fillStyle = isRevealedRef.current ? '#3a0808' : '#030a03';
           bgCtx.fillRect(0, 0, rect.width, rect.height);
 
           const t = getTransform(bg.width, bg.height, rect.width, rect.height, mobile);
@@ -581,13 +581,17 @@ export default function ScratchReveal({
           }}>
             <TypewriterText
               text="El mismo actor de Iron Man será Doctor Doom. Toca y descubre quién hay detrás."
-              speed={45}
-              readDelay={4000}
+              speed={42}
+              readDelay={6500}
               onComplete={() => {
                 if (!textComplete) {
-                  setTextComplete(true);
-                  setShowMarketing(false);
-                  setPhase(3);
+                  // Esperar un poco antes de ocultar el texto y avanzar
+                  const fadeT = window.setTimeout(() => {
+                    setTextComplete(true);
+                    setShowMarketing(false);
+                    setPhase(3);
+                  }, 1800);
+                  timersRef.current.push(fadeT);
                 }
               }}
               className="marketing-reveal"
