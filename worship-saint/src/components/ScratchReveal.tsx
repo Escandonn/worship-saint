@@ -10,7 +10,7 @@ interface ScratchRevealProps {
   background: string;       // Tony / Iron Man
   afterReveal?: string;     // opcional: imagen a mostrar después del texto de rostro
   billImage?: string;       // Bill — aparece en esquina inferior derecha con nube de diálogo
-  emoginImage?: string;     // Emogin — aparece después de Bill con mensaje "listo para hablar"
+  billImage2?: string;      // Bill frame 2 — para animación de movimiento
   brushSize?: number;
 }
 
@@ -123,7 +123,7 @@ export default function ScratchReveal({
   background,
   afterReveal,
   billImage,
-  emoginImage,
+  billImage2,
   brushSize = 140,
 }: ScratchRevealProps) {
   const containerRef     = useRef<HTMLDivElement>(null);
@@ -155,8 +155,7 @@ export default function ScratchReveal({
   const [finalApplied, setFinalApplied] = useState(false);
   const [showBill, setShowBill] = useState(false);
   const [showBillBubble, setShowBillBubble] = useState(false);
-  const [showEmogin, setShowEmogin] = useState(false);
-  const [showEmoginBubble, setShowEmoginBubble] = useState(false);
+  const [billFrame, setBillFrame] = useState(0); // 0 = bill.jpg, 1 = bill-2.jpg
   const [skipped, setSkipped] = useState(false);
   const timersRef = useRef<number[]>([]);
   const finalBgAppliedRef = useRef(false);
@@ -291,20 +290,26 @@ export default function ScratchReveal({
     newBg.src = afterReveal;
   }, [textComplete, afterReveal]);
 
-  // ── Secuencia Bill + Emogin: aparece solo al final de la última imagen ──
+  // ── Secuencia Bill: aparece solo al final de la última imagen ──
   useEffect(() => {
     if (!finalApplied || !billImage) return;
-    // Bill aparece inmediatamente
+    // Bill aparece
     const t1 = window.setTimeout(() => setShowBill(true), 300);
     // Nube de diálogo de Bill tras aparecer
     const t2 = window.setTimeout(() => setShowBillBubble(true), 1400);
-    // Emogin aparece después
-    const t3 = window.setTimeout(() => setShowEmogin(true), 4200);
-    // Nube de diálogo de Emogin
-    const t4 = window.setTimeout(() => setShowEmoginBubble(true), 5300);
-    timersRef.current.push(t1, t2, t3, t4);
-    return () => { [t1, t2, t3, t4].forEach(t => window.clearTimeout(t)); };
+    timersRef.current.push(t1, t2);
+    return () => { [t1, t2].forEach(t => window.clearTimeout(t)); };
   }, [finalApplied, billImage]);
+
+  // ── Alternancia de frames de Bill (sensación de movimiento) ──
+  useEffect(() => {
+    if (!showBill || !billImage2) return;
+    const interval = window.setInterval(() => {
+      setBillFrame(f => (f === 0 ? 1 : 0));
+    }, 500); // cambia cada 500ms
+    timersRef.current.push(interval as unknown as number);
+    return () => window.clearInterval(interval);
+  }, [showBill, billImage2]);
 
   const imgsRef = useRef<{
     bg: HTMLImageElement | null;
@@ -462,7 +467,12 @@ export default function ScratchReveal({
 
       // ── 1. Rascado + tracking de progreso ─────────────────────────────────
       if (drawing) {
-        const dist = Math.sqrt((state.x - state.lastX) ** 2 + (state.y - state.lastY) ** 2);
+        const x = state.x ?? 0;
+        const y = state.y ?? 0;
+        const lastX = state.lastX ?? 0;
+        const lastY = state.lastY ?? 0;
+        const speed = state.speed ?? 0;
+        const dist = Math.sqrt((x - lastX) ** 2 + (y - lastY) ** 2);
 
         // Progreso total: 0 → 1 (4500px de recorrido total)
         scratchProgress.current = Math.min(1, scratchProgress.current + dist / 4500);
@@ -486,9 +496,9 @@ export default function ScratchReveal({
         drawBrush(scratchCtx, state, brushSize);
 
         // Partículas reducidas para rendimiento
-        const n = Math.max(0, Math.floor(state.speed / 6));
+        const n = Math.max(0, Math.floor(speed / 6));
         if (n > 0 || Math.random() > 0.7) {
-          particleSystem.current.emit(state.x, state.y, state.speed, Math.min(n || 1, 3));
+          particleSystem.current.emit(x, y, speed, Math.min(n || 1, 3));
         }
         if (dist > 2) userInteractedRef.current = true;
         needsRedraw = true;
@@ -862,17 +872,24 @@ export default function ScratchReveal({
               0%, 100% { transform: translateY(0); }
               50% { transform: translateY(-4px); }
             }
+            @keyframes billFrameSwap {
+              0% { opacity: 1; }
+              45% { opacity: 0.3; }
+              50% { opacity: 0; }
+              55% { opacity: 0.3; }
+              100% { opacity: 1; }
+            }
           `}</style>
 
-          {/* Bill personaje */}
+          {/* Bill personaje — más grande, alterna entre bill.jpg y bill-2.jpg */}
           {showBill && (
             <div style={{
               position: 'absolute',
-              bottom: mobileHeader ? '0.5rem' : '1rem',
-              right: mobileHeader ? '0.5rem' : '1.5rem',
+              bottom: mobileHeader ? '0' : '0.5rem',
+              right: mobileHeader ? '0' : '1rem',
               zIndex: 30,
-              width: mobileHeader ? '90px' : '130px',
-              height: mobileHeader ? '90px' : '130px',
+              width: mobileHeader ? '160px' : '240px',
+              height: mobileHeader ? '160px' : '240px',
               animation: 'billSlideIn 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards',
               pointerEvents: 'none',
             }}>
@@ -880,21 +897,41 @@ export default function ScratchReveal({
                 src={billImage}
                 alt="Bill"
                 style={{
+                  position: 'absolute',
+                  inset: 0,
                   width: '100%',
                   height: '100%',
                   objectFit: 'contain',
                   filter: 'drop-shadow(0 6px 20px rgba(0,0,0,0.5))',
+                  opacity: billFrame === 0 ? 1 : 0,
+                  transition: 'opacity 0.2s ease-in-out',
                 }}
               />
+              {billImage2 && (
+                <img
+                  src={billImage2}
+                  alt="Bill"
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'contain',
+                    filter: 'drop-shadow(0 6px 20px rgba(0,0,0,0.5))',
+                    opacity: billFrame === 1 ? 1 : 0,
+                    transition: 'opacity 0.2s ease-in-out',
+                  }}
+                />
+              )}
             </div>
           )}
 
           {/* Nube de diálogo de Bill */}
-          {showBillBubble && !showEmogin && (
+          {showBillBubble && (
             <div style={{
               position: 'absolute',
-              bottom: mobileHeader ? '5rem' : '7.5rem',
-              right: mobileHeader ? '3.5rem' : '6rem',
+              bottom: mobileHeader ? '8.5rem' : '13rem',
+              right: mobileHeader ? '6rem' : '10rem',
               zIndex: 31,
               maxWidth: mobileHeader ? '200px' : '280px',
               padding: mobileHeader ? '0.7rem 1rem' : '0.9rem 1.3rem',
@@ -922,66 +959,6 @@ export default function ScratchReveal({
                 borderLeft: '10px solid transparent',
                 borderRight: '10px solid transparent',
                 borderTop: '12px solid rgba(255, 255, 255, 0.96)',
-              }} />
-            </div>
-          )}
-
-          {/* Emogin personaje */}
-          {showEmogin && emoginImage && (
-            <div style={{
-              position: 'absolute',
-              bottom: mobileHeader ? '0.5rem' : '1rem',
-              right: mobileHeader ? '5rem' : '8rem',
-              zIndex: 30,
-              width: mobileHeader ? '70px' : '100px',
-              height: mobileHeader ? '70px' : '100px',
-              animation: 'billSlideIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards',
-              pointerEvents: 'none',
-            }}>
-              <img
-                src={emoginImage}
-                alt="Emogin"
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'contain',
-                  filter: 'drop-shadow(0 6px 20px rgba(0,0,0,0.5))',
-                }}
-              />
-            </div>
-          )}
-
-          {/* Nube de diálogo de Emogin */}
-          {showEmoginBubble && (
-            <div style={{
-              position: 'absolute',
-              bottom: mobileHeader ? '4rem' : '6rem',
-              right: mobileHeader ? '7rem' : '11rem',
-              zIndex: 31,
-              maxWidth: mobileHeader ? '160px' : '220px',
-              padding: mobileHeader ? '0.55rem 0.85rem' : '0.7rem 1.1rem',
-              background: 'rgba(255, 248, 220, 0.96)',
-              borderRadius: '16px',
-              boxShadow: '0 8px 30px rgba(0,0,0,0.35), 0 0 16px rgba(255,215,0,0.2)',
-              fontFamily: "'Cinzel', serif",
-              fontSize: mobileHeader ? '0.68rem' : '0.8rem',
-              fontWeight: 700,
-              color: '#3a0808',
-              lineHeight: 1.4,
-              animation: 'bubblePopIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards, bubbleFloat 3s ease-in-out 0.5s infinite',
-              pointerEvents: 'none',
-            }}>
-              <span style={{ color: '#5C0000', fontWeight: 800 }}>Listo para hablar</span>
-              {/* Cola de la nube */}
-              <div style={{
-                position: 'absolute',
-                bottom: '-10px',
-                right: mobileHeader ? '10px' : '18px',
-                width: '0',
-                height: '0',
-                borderLeft: '10px solid transparent',
-                borderRight: '10px solid transparent',
-                borderTop: '12px solid rgba(255, 248, 220, 0.96)',
               }} />
             </div>
           )}
