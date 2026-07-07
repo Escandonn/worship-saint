@@ -1,0 +1,222 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// Bill Sequence: Bill corner + Bill central + sus burbujas de diálogo
+// ─────────────────────────────────────────────────────────────────────────────
+import { useState, useEffect } from 'react';
+import { TIMING } from './types';
+
+interface BillSequenceProps {
+  finalApplied: boolean;
+  billImage?: string;
+  billImage2?: string;
+  billCentralImage?: string;
+  mobileHeader: boolean;
+}
+
+export function BillSequence({
+  finalApplied,
+  billImage,
+  billImage2,
+  billCentralImage,
+  mobileHeader,
+}: BillSequenceProps) {
+  const [showBill, setShowBill] = useState(false);
+  const [showBillBubble, setShowBillBubble] = useState(false);
+  const [showBillCentral, setShowBillCentral] = useState(false);
+  const [showBillCentralBubble, setShowBillCentralBubble] = useState(false);
+  const [billFrame, setBillFrame] = useState(0);
+
+  // ── Secuencia Bill corner ──────────────────────────────────────────────────
+  useEffect(() => {
+    if (!finalApplied || !billImage) return;
+    const t1 = window.setTimeout(() => setShowBill(true), TIMING.BILL_SHOW);
+    const t2 = window.setTimeout(() => setShowBillBubble(true), TIMING.BILL_BUBBLE);
+    return () => { window.clearTimeout(t1); window.clearTimeout(t2); };
+  }, [finalApplied, billImage]);
+
+  // ── Secuencia Bill central ─────────────────────────────────────────────────
+  useEffect(() => {
+    if (!showBillBubble || !billCentralImage) return;
+    const t1 = window.setTimeout(() => setShowBillCentral(true), TIMING.BILL_CENTRAL_SHOW);
+    const t2 = window.setTimeout(() => setShowBillCentralBubble(true), TIMING.BILL_CENTRAL_BUBBLE);
+    return () => { window.clearTimeout(t1); window.clearTimeout(t2); };
+  }, [showBillBubble, billCentralImage]);
+
+  // ── Alternancia de frames de Bill (animación) ──────────────────────────────
+  useEffect(() => {
+    if (!showBill || !billImage2) return;
+    const interval = window.setInterval(() => {
+      setBillFrame(f => (f === 0 ? 1 : 0));
+    }, TIMING.BILL_FRAME_INTERVAL);
+    return () => window.clearInterval(interval);
+  }, [showBill, billImage2]);
+
+  if (!finalApplied || !billImage) return null;
+
+  return (
+    <>
+      <style>{`
+        @keyframes billSlideIn {
+          0% { transform: translateY(40px) scale(0.7); opacity: 0; }
+          60% { transform: translateY(-6px) scale(1.05); opacity: 1; }
+          100% { transform: translateY(0) scale(1); opacity: 1; }
+        }
+        @keyframes bubblePopIn {
+          0% { transform: scale(0.3) translateY(10px); opacity: 0; }
+          50% { transform: scale(1.08) translateY(-4px); opacity: 1; }
+          100% { transform: scale(1) translateY(0); opacity: 1; }
+        }
+        @keyframes bubbleFloat {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-4px); }
+        }
+      `}</style>
+
+      {/* ── Bill personaje (esquina inferior derecha) ── */}
+      {showBill && (
+        <div style={{
+          position: 'absolute',
+          bottom: mobileHeader ? '0' : '0.5rem',
+          right: mobileHeader ? '0' : '1rem',
+          zIndex: 30,
+          width: mobileHeader ? '160px' : '240px',
+          height: mobileHeader ? '160px' : '240px',
+          animation: 'billSlideIn 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards',
+          pointerEvents: 'none',
+        }}>
+          <img
+            src={billImage}
+            alt="Bill"
+            style={{
+              position: 'absolute', inset: 0,
+              width: '100%', height: '100%',
+              objectFit: 'contain',
+              filter: 'drop-shadow(0 6px 20px rgba(0,0,0,0.5))',
+              opacity: billFrame === 0 ? 1 : 0,
+              transition: 'opacity 0.2s ease-in-out',
+            }}
+          />
+          {billImage2 && (
+            <img
+              src={billImage2}
+              alt="Bill"
+              style={{
+                position: 'absolute', inset: 0,
+                width: '100%', height: '100%',
+                objectFit: 'contain',
+                filter: 'drop-shadow(0 6px 20px rgba(0,0,0,0.5))',
+                opacity: billFrame === 1 ? 1 : 0,
+                transition: 'opacity 0.2s ease-in-out',
+              }}
+            />
+          )}
+        </div>
+      )}
+
+      {/* ── Burbuja de Bill ── */}
+      {showBillBubble && (
+        <div style={{
+          position: 'absolute',
+          bottom: mobileHeader ? '8.5rem' : '13rem',
+          right: mobileHeader ? '6rem' : '10rem',
+          zIndex: 31,
+          maxWidth: mobileHeader ? '200px' : '280px',
+          padding: mobileHeader ? '0.7rem 1rem' : '0.9rem 1.3rem',
+          background: 'rgba(255, 255, 255, 0.96)',
+          borderRadius: '18px',
+          boxShadow: '0 8px 30px rgba(0,0,0,0.35), 0 0 16px rgba(212,175,55,0.2)',
+          fontFamily: "'Cinzel', serif",
+          fontSize: mobileHeader ? '0.72rem' : '0.85rem',
+          fontWeight: 700,
+          color: '#3a0808',
+          lineHeight: 1.4,
+          animation: 'bubblePopIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards, bubbleFloat 3s ease-in-out 0.5s infinite',
+          pointerEvents: 'none',
+        }}>
+          <span style={{ color: '#5C0000', fontWeight: 800 }}>¡Hola! Soy Bill</span>
+          <br />
+          <span style={{ color: '#7a1010' }}>y soy la que te explicará todo</span>
+          {/* Cola de la nube */}
+          <div style={{
+            position: 'absolute',
+            bottom: '-10px',
+            right: mobileHeader ? '12px' : '20px',
+            width: '0', height: '0',
+            borderLeft: '10px solid transparent',
+            borderRight: '10px solid transparent',
+            borderTop: '12px solid rgba(255, 255, 255, 0.96)',
+          }} />
+        </div>
+      )}
+
+      {/* ── Bill Central (centro inferior) ── */}
+      {showBillCentral && billCentralImage && (
+        <div style={{
+          position: 'absolute',
+          bottom: '0',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 30,
+          width: mobileHeader ? '140px' : '200px',
+          height: mobileHeader ? '140px' : '200px',
+          animation: 'billSlideIn 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards',
+          pointerEvents: 'none',
+        }}>
+          <img
+            src={billCentralImage}
+            alt="Bill Central"
+            style={{
+              width: '100%', height: '100%',
+              objectFit: 'contain',
+              filter: 'drop-shadow(0 6px 20px rgba(0,0,0,0.5))',
+            }}
+          />
+        </div>
+      )}
+
+      {/* ── Burbuja de Bill Central ── */}
+      {showBillCentralBubble && (
+        <div style={{
+          position: 'absolute',
+          bottom: mobileHeader ? '10rem' : '14rem',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 31,
+          maxWidth: mobileHeader ? '240px' : '360px',
+          padding: mobileHeader ? '0.8rem 1.1rem' : '1rem 1.5rem',
+          background: 'rgba(255, 255, 255, 0.96)',
+          borderRadius: '18px',
+          boxShadow: '0 8px 30px rgba(0,0,0,0.35), 0 0 16px rgba(212,175,55,0.2)',
+          fontFamily: "'Cinzel', serif",
+          fontSize: mobileHeader ? '0.7rem' : '0.82rem',
+          fontWeight: 700,
+          color: '#3a0808',
+          lineHeight: 1.5,
+          textAlign: 'center',
+          animation: 'bubblePopIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards, bubbleFloat 3s ease-in-out 0.5s infinite',
+          pointerEvents: 'none',
+        }}>
+          <span style={{ color: '#5C0000', fontWeight: 800 }}>¡Worship es una entidad de estudio</span>
+          <br />
+          <span style={{ color: '#7a1010' }}>que desarrolla páginas web y software de calidad.</span>
+          <br />
+          <span style={{ color: '#5C0000', fontWeight: 800 }}>Tiene su tienda de ecommerces</span>
+          <br />
+          <span style={{ color: '#7a1010' }}>y financia su club de fútbol.</span>
+          <br />
+          <span style={{ color: '#5C0000', fontWeight: 800 }}>Seguimos las enseñanzas de nuestro maestro Samuel.</span>
+          {/* Cola de la nube */}
+          <div style={{
+            position: 'absolute',
+            bottom: '-10px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            width: '0', height: '0',
+            borderLeft: '10px solid transparent',
+            borderRight: '10px solid transparent',
+            borderTop: '12px solid rgba(255, 255, 255, 0.96)',
+          }} />
+        </div>
+      )}
+    </>
+  );
+}

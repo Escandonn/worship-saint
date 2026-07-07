@@ -11,6 +11,7 @@ interface ScratchRevealProps {
   afterReveal?: string;     // opcional: imagen a mostrar después del texto de rostro
   billImage?: string;       // Bill — aparece en esquina inferior derecha con nube de diálogo
   billImage2?: string;      // Bill frame 2 — para animación de movimiento
+  billCentralImage?: string; // Bill central — aparece de abajo arriba en el centro inferior
   brushSize?: number;
 }
 
@@ -124,6 +125,7 @@ export default function ScratchReveal({
   afterReveal,
   billImage,
   billImage2,
+  billCentralImage,
   brushSize = 140,
 }: ScratchRevealProps) {
   const containerRef     = useRef<HTMLDivElement>(null);
@@ -156,7 +158,10 @@ export default function ScratchReveal({
   const [showBill, setShowBill] = useState(false);
   const [showBillBubble, setShowBillBubble] = useState(false);
   const [billFrame, setBillFrame] = useState(0); // 0 = bill.jpg, 1 = bill-2.jpg
+  const [showBillCentral, setShowBillCentral] = useState(false);
+  const [showBillCentralBubble, setShowBillCentralBubble] = useState(false);
   const [skipped, setSkipped] = useState(false);
+  const [skipFading, setSkipFading] = useState(false);
   const timersRef = useRef<number[]>([]);
   const finalBgAppliedRef = useRef(false);
   const userInteractedRef = useRef(false);
@@ -192,19 +197,24 @@ export default function ScratchReveal({
 
   // ── SKIP: salta toda la experiencia a la imagen final ──
   const handleSkip = () => {
-    if (skipped) return;
-    setSkipped(true);
-    timersRef.current.forEach(id => window.clearTimeout(id));
-    timersRef.current = [];
-    setShowHint(false);
-    setShowMarketing(false);
-    // forzar reveal + transición final
-    scratchProgress.current = 1;
-    isRevealedRef.current = true;
-    setIsRevealed(true);
-    setPhase(3);
-    setTextComplete(true);
-    userInteractedRef.current = true;
+    if (skipped || skipFading) return;
+    // Fade out rápido y luego saltar
+    setSkipFading(true);
+    const t = window.setTimeout(() => {
+      setSkipped(true);
+      timersRef.current.forEach(id => window.clearTimeout(id));
+      timersRef.current = [];
+      setShowHint(false);
+      setShowMarketing(false);
+      // forzar reveal + transición final
+      scratchProgress.current = 1;
+      isRevealedRef.current = true;
+      setIsRevealed(true);
+      setPhase(3);
+      setTextComplete(true);
+      userInteractedRef.current = true;
+    }, 300); // fade out rápido en 300ms
+    timersRef.current.push(t);
   };
 
   // ── Fase 2: al revelarse Tony, mostrar texto de marketing (sincrónico) ──
@@ -300,6 +310,17 @@ export default function ScratchReveal({
     timersRef.current.push(t1, t2);
     return () => { [t1, t2].forEach(t => window.clearTimeout(t)); };
   }, [finalApplied, billImage]);
+
+  // ── Secuencia Bill Central: aparece después de la nube de Bill ──
+  useEffect(() => {
+    if (!showBillBubble || !billCentralImage) return;
+    // Bill central aparece de abajo arriba
+    const t1 = window.setTimeout(() => setShowBillCentral(true), 2000);
+    // Nube de diálogo de Bill central
+    const t2 = window.setTimeout(() => setShowBillCentralBubble(true), 3700);
+    timersRef.current.push(t1, t2);
+    return () => { [t1, t2].forEach(t => window.clearTimeout(t)); };
+  }, [showBillBubble, billCentralImage]);
 
   // ── Alternancia de frames de Bill (sensación de movimiento) ──
   useEffect(() => {
@@ -663,7 +684,7 @@ export default function ScratchReveal({
       )}
 
       {/* ── SKIP button (siempre visible hasta completar) ── */}
-      {!finalApplied && (
+      {!skipped && (
         <button
           type="button"
           onClick={handleSkip}
@@ -687,10 +708,12 @@ export default function ScratchReveal({
             cursor: 'pointer',
             backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)',
             boxShadow: `0 6px 24px rgba(0,0,0,0.4)`,
-            transition: 'transform 0.2s ease, background 0.2s ease',
+            transition: skipFading ? 'opacity 0.3s ease, transform 0.3s ease' : 'transform 0.2s ease, background 0.2s ease',
+            opacity: skipFading ? 0 : 1,
+            transform: skipFading ? 'scale(0.85)' : 'scale(1)',
           }}
-          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(1.05)'; (e.currentTarget as HTMLElement).style.background = 'rgba(0,0,0,0.8)'; }}
-          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(1)'; (e.currentTarget as HTMLElement).style.background = 'rgba(0,0,0,0.6)'; }}
+          onMouseEnter={e => { if (!skipFading) { (e.currentTarget as HTMLElement).style.transform = 'scale(1.05)'; (e.currentTarget as HTMLElement).style.background = 'rgba(0,0,0,0.8)'; } }}
+          onMouseLeave={e => { if (!skipFading) { (e.currentTarget as HTMLElement).style.transform = 'scale(1)'; (e.currentTarget as HTMLElement).style.background = 'rgba(0,0,0,0.6)'; } }}
         >
           Saltar ✕
         </button>
@@ -733,11 +756,31 @@ export default function ScratchReveal({
                 @keyframes sweepLR { from { left: -160%; } to { left: 160%; } }
                 .sweep-on .sweep-bar { animation: sweepLR 1.6s ease-in-out forwards; }
               `}</style>
-              <span className={headerVisible ? 'sweep-text sweep-on' : 'sweep-text'} style={{ color: textColor, fontFamily: "'Cinzel', serif", fontSize: mobileHeader ? '0.82rem' : '0.8rem', fontWeight: 700, letterSpacing: '0.24em', textTransform: 'uppercase' }}>
+              <span className={headerVisible ? 'sweep-text sweep-on' : 'sweep-text'} style={{
+                color: textColor,
+                fontFamily: "'Cinzel', serif",
+                fontSize: mobileHeader ? '0.82rem' : '0.8rem',
+                fontWeight: 700,
+                letterSpacing: '0.24em',
+                textTransform: 'uppercase',
+                textShadow: isRevealed
+                  ? '0 0 16px rgba(212,175,55,0.6), 0 0 32px rgba(212,175,55,0.3)'
+                  : '0 0 16px rgba(0,255,136,0.5), 0 0 32px rgba(0,255,136,0.25)',
+              }}>
                 Worship-Saint
                 <span className="sweep-bar" />
               </span>
-              <span className={headerVisible ? 'sweep-text sweep-on' : 'sweep-text'} style={{ color: accentColor, fontFamily: "'Cinzel', serif", fontSize: mobileHeader ? '0.62rem' : '0.64rem', fontWeight: 700, letterSpacing: '0.24em', textTransform: 'uppercase' }}>
+              <span className={headerVisible ? 'sweep-text sweep-on' : 'sweep-text'} style={{
+                color: accentColor,
+                fontFamily: "'Cinzel', serif",
+                fontSize: mobileHeader ? '0.62rem' : '0.64rem',
+                fontWeight: 700,
+                letterSpacing: '0.24em',
+                textTransform: 'uppercase',
+                textShadow: isRevealed
+                  ? '0 0 12px rgba(212,175,55,0.5), 0 0 24px rgba(212,175,55,0.25)'
+                  : '0 0 12px rgba(0,255,136,0.4), 0 0 24px rgba(0,255,136,0.2)',
+              }}>
                 Estudio de impacto
                 <span className="sweep-bar" />
               </span>
@@ -786,6 +829,9 @@ export default function ScratchReveal({
                     textTransform: 'uppercase',
                     textDecoration: 'none',
                     transition: 'color 0.25s ease',
+                    textShadow: isRevealed
+                      ? '0 0 10px rgba(212,175,55,0.4)'
+                      : '0 0 10px rgba(0,255,136,0.3)',
                   }}
                   onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = '#ffffff'; }}
                   onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = linkColor; }}
@@ -829,6 +875,9 @@ export default function ScratchReveal({
                 borderRadius: '14px',
                 background: 'rgba(255,255,255,0.04)',
                 transition: 'background 0.25s ease',
+                textShadow: isRevealed
+                  ? '0 0 10px rgba(212,175,55,0.4)'
+                  : '0 0 10px rgba(0,255,136,0.3)',
               }}
               onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.08)'; }}
               onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.04)'; }}
@@ -954,6 +1003,78 @@ export default function ScratchReveal({
                 position: 'absolute',
                 bottom: '-10px',
                 right: mobileHeader ? '12px' : '20px',
+                width: '0',
+                height: '0',
+                borderLeft: '10px solid transparent',
+                borderRight: '10px solid transparent',
+                borderTop: '12px solid rgba(255, 255, 255, 0.96)',
+              }} />
+            </div>
+          )}
+
+          {/* ── Bill Central (centro inferior) — aparece de abajo arriba ── */}
+          {showBillCentral && billCentralImage && (
+            <div style={{
+              position: 'absolute',
+              bottom: mobileHeader ? '0' : '0',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              zIndex: 30,
+              width: mobileHeader ? '140px' : '200px',
+              height: mobileHeader ? '140px' : '200px',
+              animation: 'billSlideIn 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards',
+              pointerEvents: 'none',
+            }}>
+              <img
+                src={billCentralImage}
+                alt="Bill Central"
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'contain',
+                  filter: 'drop-shadow(0 6px 20px rgba(0,0,0,0.5))',
+                }}
+              />
+            </div>
+          )}
+
+          {/* Nube de diálogo de Bill Central */}
+          {showBillCentralBubble && (
+            <div style={{
+              position: 'absolute',
+              bottom: mobileHeader ? '10rem' : '14rem',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              zIndex: 31,
+              maxWidth: mobileHeader ? '240px' : '360px',
+              padding: mobileHeader ? '0.8rem 1.1rem' : '1rem 1.5rem',
+              background: 'rgba(255, 255, 255, 0.96)',
+              borderRadius: '18px',
+              boxShadow: '0 8px 30px rgba(0,0,0,0.35), 0 0 16px rgba(212,175,55,0.2)',
+              fontFamily: "'Cinzel', serif",
+              fontSize: mobileHeader ? '0.7rem' : '0.82rem',
+              fontWeight: 700,
+              color: '#3a0808',
+              lineHeight: 1.5,
+              textAlign: 'center',
+              animation: 'bubblePopIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards, bubbleFloat 3s ease-in-out 0.5s infinite',
+              pointerEvents: 'none',
+            }}>
+              <span style={{ color: '#5C0000', fontWeight: 800 }}>¡Worship es una entidad de estudio</span>
+              <br />
+              <span style={{ color: '#7a1010' }}>que desarrolla páginas web y software de calidad.</span>
+              <br />
+              <span style={{ color: '#5C0000', fontWeight: 800 }}>Tiene su tienda de ecommerces</span>
+              <br />
+              <span style={{ color: '#7a1010' }}>y financia su club de fútbol.</span>
+              <br />
+              <span style={{ color: '#5C0000', fontWeight: 800 }}>Seguimos las enseñanzas de nuestro maestro Samuel.</span>
+              {/* Cola de la nube */}
+              <div style={{
+                position: 'absolute',
+                bottom: '-10px',
+                left: '50%',
+                transform: 'translateX(-50%)',
                 width: '0',
                 height: '0',
                 borderLeft: '10px solid transparent',
