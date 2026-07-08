@@ -133,7 +133,7 @@ export function PhaseOverlays({
             // ── Posición del botón Saltar ──
             // PC:      bottom 1.5rem
             // Móvil:   bottom 3rem  ← ajusta este valor
-            bottom: mobileHeader ? '2rem' : '1.5rem',
+            bottom: mobileHeader ? '10rem' : '1.5rem',
             left: '50%',
             transform: 'translateX(-50%)',
             zIndex: 25,
