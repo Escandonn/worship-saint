@@ -38,7 +38,7 @@ export function BillSequence({
         width:      '340px',  // ancho de la imagen
         height:     '280px',  // alto de la imagen
         left:       '20%',    // posición horizontal (usa % o px)
-        bottom:     '-60px',    // posición desde el fondo
+        bottom:     '10px',    // posición desde el fondo
         translateX: '-50%',   // offset horizontal (centrado con left:50%)
         translateY: '0px',    // offset vertical
       }
