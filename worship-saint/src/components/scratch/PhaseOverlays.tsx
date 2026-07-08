@@ -130,7 +130,10 @@ export function PhaseOverlays({
           onClick={handleSkip}
           style={{
             position: 'absolute',
-            bottom: mobileHeader ? '1.2rem' : '1.5rem',
+            // ── Posición del botón Saltar ──
+            // PC:      bottom 1.5rem
+            // Móvil:   bottom 3rem  ← ajusta este valor
+            bottom: mobileHeader ? '2rem' : '1.5rem',
             left: '50%',
             transform: 'translateX(-50%)',
             zIndex: 25,
