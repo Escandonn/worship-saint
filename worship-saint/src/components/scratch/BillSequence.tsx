@@ -26,7 +26,32 @@ export function BillSequence({
   const [showBillCentral, setShowBillCentral] = useState(false);
   const [showBillCentralBubble, setShowBillCentralBubble] = useState(false);
   const [billFrame, setBillFrame] = useState(0);
+  const [billFading, setBillFading] = useState(false);
   const billFrameIntervalRef = useRef<number | null>(null);
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // CONFIGURACIÓN DE BILL CENTRAL — Modifica estos valores para reposicionar
+  // ══════════════════════════════════════════════════════════════════════════
+  const billCentralConfig = mobileHeader
+    ? {
+        // ── MÓVIL ──
+        width:      '340px',  // ancho de la imagen
+        height:     '280px',  // alto de la imagen
+        left:       '20%',    // posición horizontal (usa % o px)
+        bottom:     '-60px',    // posición desde el fondo
+        translateX: '-50%',   // offset horizontal (centrado con left:50%)
+        translateY: '0px',    // offset vertical
+      }
+    : {
+        // ── PC ──
+        width:      '500px',  // ancho de la imagen
+        height:     '500px',  // alto de la imagen
+        left:       '37%',    // posición horizontal (usa % o px)
+        bottom:     '-160px',    // posición desde el fondo
+        translateX: '-50%',   // offset horizontal (centrado con left:50%)
+        translateY: '0px',    // offset vertical
+      };
+  // ══════════════════════════════════════════════════════════════════════════
 
   // ── Secuencia Bill corner ──────────────────────────────────────────────────
   useEffect(() => {
@@ -37,23 +62,40 @@ export function BillSequence({
   }, [finalApplied, billImage]);
 
   // ── Secuencia Bill central ─────────────────────────────────────────────────
+  // Bill corner se desvanece cuando aparece Bill central (una a la vez)
   useEffect(() => {
     if (!showBillBubble || !billCentralImage) return;
-    const t1 = window.setTimeout(() => setShowBillCentral(true), TIMING.BILL_CENTRAL_SHOW);
+    const t1 = window.setTimeout(() => {
+      setBillFading(true);   // iniciar fade-out de Bill corner + burbuja
+      setShowBillCentral(true);
+    }, TIMING.BILL_CENTRAL_SHOW);
+    // Tras el fade, ocultar completamente Bill corner + burbuja (sin afectar central)
+    const t3 = window.setTimeout(() => {
+      setShowBill(false);
+      setShowBillBubble(false);
+      setBillFading(false);
+    }, TIMING.BILL_CENTRAL_SHOW + 600);
+    return () => { window.clearTimeout(t1); window.clearTimeout(t3); };
+  }, [showBillBubble, billCentralImage]);
+
+  // ── Burbuja de Bill central (independiente para no perderse al limpiar timers) ──
+  useEffect(() => {
+    if (!showBillCentral || !billCentralImage) return;
     const t2 = window.setTimeout(() => {
       setShowBillCentralBubble(true);
       onCinematicComplete?.();
-    }, TIMING.BILL_CENTRAL_BUBBLE);
-    return () => { window.clearTimeout(t1); window.clearTimeout(t2); };
-  }, [showBillBubble, billCentralImage, onCinematicComplete]);
+    }, TIMING.BILL_CENTRAL_BUBBLE - TIMING.BILL_CENTRAL_SHOW);
+    return () => { window.clearTimeout(t2); };
+  }, [showBillCentral, billCentralImage, onCinematicComplete]);
 
   // ── Alternancia de frames de Bill (animación) ──────────────────────────────
   // Bug 2b fix: usar ref dedicado para que el intervalo sobreviva a limpieza de timers del padre
   useEffect(() => {
-    if (!showBill || !billImage2) return;
+    if (!showBill || !billImage2 || billFading) return;
     // Limpiar interval anterior si existe
     if (billFrameIntervalRef.current !== null) {
       window.clearInterval(billFrameIntervalRef.current);
+      billFrameIntervalRef.current = null;
     }
     billFrameIntervalRef.current = window.setInterval(() => {
       setBillFrame(f => (f === 0 ? 1 : 0));
@@ -64,7 +106,7 @@ export function BillSequence({
         billFrameIntervalRef.current = null;
       }
     };
-  }, [showBill, billImage2]);
+  }, [showBill, billImage2, billFading]);
 
   if (!finalApplied || !billImage) return null;
 
@@ -85,6 +127,10 @@ export function BillSequence({
           0%, 100% { transform: translateY(0); }
           50% { transform: translateY(-4px); }
         }
+        @keyframes billFadeOut {
+          0% { opacity: 1; transform: translateY(0) scale(1); }
+          100% { opacity: 0; transform: translateY(20px) scale(0.8); }
+        }
       `}</style>
 
       {/* ── Bill personaje (esquina inferior derecha) ── */}
@@ -96,7 +142,9 @@ export function BillSequence({
           zIndex: 30,
           width: mobileHeader ? '160px' : '240px',
           height: mobileHeader ? '160px' : '240px',
-          animation: 'billSlideIn 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards',
+          animation: billFading
+            ? 'billFadeOut 0.6s ease-in forwards'
+            : 'billSlideIn 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards',
           pointerEvents: 'none',
         }}>
           <img
@@ -145,7 +193,9 @@ export function BillSequence({
           fontWeight: 700,
           color: '#3a0808',
           lineHeight: 1.4,
-          animation: 'bubblePopIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards, bubbleFloat 3s ease-in-out 0.5s infinite',
+          animation: billFading
+            ? 'billFadeOut 0.6s ease-in forwards'
+            : 'bubblePopIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards, bubbleFloat 3s ease-in-out 0.5s infinite',
           pointerEvents: 'none',
         }}>
           <span style={{ color: '#5C0000', fontWeight: 800 }}>¡Hola! Soy Bill</span>
@@ -168,12 +218,12 @@ export function BillSequence({
       {showBillCentral && billCentralImage && (
         <div style={{
           position: 'absolute',
-          bottom: '0',
-          left: '50%',
-          transform: 'translateX(-50%)',
+          left:       billCentralConfig.left,
+          bottom:     billCentralConfig.bottom,
+          transform:  `translateX(${billCentralConfig.translateX}) translateY(${billCentralConfig.translateY})`,
           zIndex: 30,
-          width: mobileHeader ? '140px' : '200px',
-          height: mobileHeader ? '140px' : '200px',
+          width:      billCentralConfig.width,
+          height:     billCentralConfig.height,
           animation: 'billSlideIn 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards',
           pointerEvents: 'none',
         }}>
@@ -193,8 +243,8 @@ export function BillSequence({
       {showBillCentralBubble && (
         <div style={{
           position: 'absolute',
-          bottom: mobileHeader ? '10rem' : '14rem',
-          left: '50%',
+          bottom: mobileHeader ? '12rem' : '14rem',
+          left: mobileHeader ? '37%' : '50%',
           transform: 'translateX(-50%)',
           zIndex: 31,
           maxWidth: mobileHeader ? '240px' : '360px',
