@@ -55,12 +55,14 @@ export function usePointer(containerRef: React.RefObject<HTMLElement | null>) {
 
     const handlePointerDown = (e: Event) => {
       const pe = e as PointerEvent;
+      pe.preventDefault();
       updatePoint(pe.clientX, pe.clientY, true);
     };
 
     const handlePointerMove = (e: Event) => {
       const pe = e as PointerEvent;
       if (!state.current.isDrawing) return;
+      pe.preventDefault();
       updatePoint(pe.clientX, pe.clientY, true);
     };
 
@@ -86,9 +88,9 @@ export function usePointer(containerRef: React.RefObject<HTMLElement | null>) {
       state.current.lastY = null;
     };
 
-    // Use passive listeners for peak scroll/touch performance
-    el.addEventListener('pointerdown', handlePointerDown as EventListener, { passive: true });
-    el.addEventListener('pointermove', handlePointerMove as EventListener, { passive: true });
+    // Use passive: false so we can preventDefault and stop scroll on touch
+    el.addEventListener('pointerdown', handlePointerDown as EventListener, { passive: false });
+    el.addEventListener('pointermove', handlePointerMove as EventListener, { passive: false });
     el.addEventListener('pointerup', handlePointerUp as EventListener, { passive: true });
     el.addEventListener('pointercancel', handlePointerUp as EventListener, { passive: true });
     el.addEventListener('pointerenter', handlePointerEnter as EventListener, { passive: true });

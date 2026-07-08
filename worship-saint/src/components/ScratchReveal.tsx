@@ -267,7 +267,7 @@ export default function ScratchReveal({
       />
       <canvas
         ref={scratchCanvasRef}
-        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', zIndex: 10, cursor: 'crosshair' }}
+        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', zIndex: 10, cursor: 'crosshair', touchAction: 'none' }}
       />
       <canvas
         ref={particlesCanvasRef}
