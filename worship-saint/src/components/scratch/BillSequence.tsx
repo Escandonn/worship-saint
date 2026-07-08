@@ -49,6 +49,25 @@ export function BillSequence({
       };
 
   // ══════════════════════════════════════════════════════════════════════════
+  // CONFIGURACIÓN DE LA BURBUJA DE BILL CORNER — Modifica estos valores
+  // ══════════════════════════════════════════════════════════════════════════
+  const billCornerBubbleConfig = mobileHeader
+    ? {
+        // ── MÓVIL ──
+        bottom:   '11rem',   // posición desde el fondo (encima de Bill)
+        right:    '1.5rem',   // posición desde la derecha
+        maxWidth: '200px',   // ancho máximo
+        tailRight:'12px',    // cola de la nube: posición desde la derecha
+      }
+    : {
+        // ── PC ──
+        bottom:   '13rem',   // posición desde el fondo (encima de Bill)
+        right:    '10rem',   // posición desde la derecha
+        maxWidth: '280px',   // ancho máximo
+        tailRight:'20px',    // cola de la nube: posición desde la derecha
+      };
+
+  // ══════════════════════════════════════════════════════════════════════════
   // CONFIGURACIÓN DE BILL CENTRAL — Modifica estos valores para reposicionar
   // ══════════════════════════════════════════════════════════════════════════
   const billCentralConfig = mobileHeader
@@ -199,10 +218,10 @@ export function BillSequence({
       {showBillBubble && (
         <div style={{
           position: 'absolute',
-          bottom: mobileHeader ? '8.5rem' : '13rem',
-          right: mobileHeader ? '6rem' : '10rem',
+          bottom: billCornerBubbleConfig.bottom,
+          right: billCornerBubbleConfig.right,
           zIndex: 31,
-          maxWidth: mobileHeader ? '200px' : '280px',
+          maxWidth: billCornerBubbleConfig.maxWidth,
           padding: mobileHeader ? '0.7rem 1rem' : '0.9rem 1.3rem',
           background: 'rgba(255, 255, 255, 0.96)',
           borderRadius: '18px',
@@ -224,7 +243,7 @@ export function BillSequence({
           <div style={{
             position: 'absolute',
             bottom: '-10px',
-            right: mobileHeader ? '12px' : '20px',
+            right: billCornerBubbleConfig.tailRight,
             width: '0', height: '0',
             borderLeft: '10px solid transparent',
             borderRight: '10px solid transparent',
