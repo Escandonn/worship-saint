@@ -37,7 +37,7 @@ export function BillSequence({
         // ── MÓVIL ──
         width:   '160px',  // ancho de la imagen
         height:  '160px',  // alto de la imagen
-        bottom:  '160px',      // posición desde el fondo
+        bottom:  '100px',      // posición desde el fondo
         right:   '20px',      // posición desde la derecha
       }
     : {
