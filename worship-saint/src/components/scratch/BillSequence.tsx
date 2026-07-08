@@ -30,6 +30,25 @@ export function BillSequence({
   const billFrameIntervalRef = useRef<number | null>(null);
 
   // ══════════════════════════════════════════════════════════════════════════
+  // CONFIGURACIÓN DE BILL CORNER (esquina inferior derecha) — Modifica estos valores
+  // ══════════════════════════════════════════════════════════════════════════
+  const billCornerConfig = mobileHeader
+    ? {
+        // ── MÓVIL ──
+        width:   '160px',  // ancho de la imagen
+        height:  '160px',  // alto de la imagen
+        bottom:  '60px',      // posición desde el fondo
+        right:   '20px',      // posición desde la derecha
+      }
+    : {
+        // ── PC ──
+        width:   '240px',  // ancho de la imagen
+        height:  '240px',  // alto de la imagen
+        bottom:  '0.5rem', // posición desde el fondo
+        right:   '1rem',   // posición desde la derecha
+      };
+
+  // ══════════════════════════════════════════════════════════════════════════
   // CONFIGURACIÓN DE BILL CENTRAL — Modifica estos valores para reposicionar
   // ══════════════════════════════════════════════════════════════════════════
   const billCentralConfig = mobileHeader
@@ -37,7 +56,7 @@ export function BillSequence({
         // ── MÓVIL ──
         width:      '340px',  // ancho de la imagen
         height:     '280px',  // alto de la imagen
-        left:       '20%',    // posición horizontal (usa % o px)
+        left:       '10%',    // posición horizontal (usa % o px)
         bottom:     '10px',    // posición desde el fondo
         translateX: '-50%',   // offset horizontal (centrado con left:50%)
         translateY: '0px',    // offset vertical
@@ -137,11 +156,11 @@ export function BillSequence({
       {showBill && (
         <div style={{
           position: 'absolute',
-          bottom: mobileHeader ? '0' : '0.5rem',
-          right: mobileHeader ? '0' : '1rem',
+          bottom: billCornerConfig.bottom,
+          right: billCornerConfig.right,
           zIndex: 30,
-          width: mobileHeader ? '160px' : '240px',
-          height: mobileHeader ? '160px' : '240px',
+          width: billCornerConfig.width,
+          height: billCornerConfig.height,
           animation: billFading
             ? 'billFadeOut 0.6s ease-in forwards'
             : 'billSlideIn 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards',
