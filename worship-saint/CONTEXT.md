@@ -73,7 +73,23 @@ src/
 | `Particles.ts` | Sistema de partículas emitadas al rascar |
 | `usePointer.ts` | Detectar drag real vs hover |
 
-**`scratch/types.ts`** exporta `TIMING`, `COLORS`, `getColors()`, `getTransform()`, `drawSideColumns()`, `computeAverageColor()`. Se importan en los sub-componentes. El `ScratchReveal.tsx` principal también tiene sus propias copias inline de estas utilidades (duplicación intencional para mantener el archivo autónomo).
+**`scratch/types.ts`** exporta `TIMING`, `COLORS`, `getColors()`, `getTransform()`, `drawSideColumns()`, `computeAverageColor()`. Se importan en los sub-componentes. `ScratchReveal.tsx` importa `drawSideColumns` directamente desde `scratch/types` (además de sus copias inline) para usarla en `handleSkip` y pintar las paredes con colores post-reveal al saltar.
+
+### `getTransform()` — ajuste de imagen al canvas
+
+```ts
+// types.ts — la imagen llena el 100% de la altura del canvas, anclada arriba (y=0)
+function getTransform(canvasW, canvasH, imgW, imgH) {
+  const scale = canvasH / imgH;       // escala para cubrir toda la altura
+  const w = imgW * scale;
+  const h = imgH * scale;             // = canvasH
+  return { x: (canvasW - w) / 2, y: 0, scale };
+}
+```
+
+- **Altura completa**: `y=0`, `h=canvasH` — no queda espacio vacío en la parte inferior
+- **Centrado horizontal**: `x=(canvasW-w)/2` — si la imagen es más angosta que el canvas, se centra
+- **Paredes laterales**: `drawSideColumns()` rellena el espacio restante a izquierda y derecha con los colores de personaje (verde pre-reveal, rojo/dorado post-reveal)
 
 ---
 
@@ -86,10 +102,10 @@ El componente `ScratchReveal` usa un estado `phase` (0-4) que controla toda la s
 | 0 | `showHint` | Texto central "Rasca la imagen" con pulso | 2600ms → desaparece automáticamente |
 | 1 | scratch activo | Usuario rasca; `scratchProgress` 0→1 | hasta que `dist / 4500 = 1` |
 | 2 | `showMarketing` | Typewriter escribe mensaje de marketing | ~texto + 6500ms lectura + 1800ms fade |
-| 3 | transición final | Rascado programático revela `afterReveal` | 4200ms (ráfagas crecientes de trazos) |
+| 3 | transición final | Rascado programático revela `afterReveal` | 5200ms con easing (ráfagas crecientes de trazos) |
 | 4 | `finalApplied` | Imagen final visible → aparece Bill | — |
 
-**SKIP:** botón "Saltar" aparece tras 800ms del hint, abajo-centro. Fuerza `phase=3`, `scratchProgress=1`, `isRevealed=true` y salta todo.
+**SKIP:** botón "Saltar" aparece tras 800ms del hint, abajo-centro. Visible hasta que `finalApplied=true` (condición: `skipVisible && !skipped && !finalApplied`). Al pulsar, `handleSkip` carga `afterReveal`, dibuja fondo rojo (`#3a0808`) en toda la canvas, dibuja la imagen final centrada con `getTransform()` (100% altura, `y=0`), pinta las paredes laterales con colores post-reveal usando `drawSideColumns(ctx, w, h, imgLeft, imgRight, true, ...)` (isRevealed=true → rojo/dorado), limpia el scratch canvas y dispara `setFinalApplied(true)`. Esto garantiza que las paredes transicionen de verde a rojo/dorado instantáneamente al saltar, sin modificar el render loop.
 
 ---
 
@@ -114,11 +130,13 @@ Bill corner alterna entre `billImage` y `billImage2` cada 500ms para dar sensaci
 `ScratchReveal` maneja 3 canvases apilados (z-index implícito por orden):
 
 1. **bgCanvasRef** — Tony (fondo fijo) + columnas laterales animadas (solo PC, `innerWidth >= 768`)
-   - `drawSideColumns()`: gradientes rojo/dorado post-reveal, verde pre-reveal
+   - `drawSideColumns()`: gradientes rojo/dorado post-reveal, verde pre-reveal; rellena TODO el espacio restante (leftW = imgLeft, rightW = canvasW - imgRight)
    - Ornamentos verticales punteados animados con `Math.sin`
    - Overlay dorado con shimmer animado
    - Throttle ~30fps (`COL_THROTTLE = 33ms`)
    - Solo redibuja cuando hay actividad (`needsRedrawRef`)
+   - **Tras `finalApplied`**: el render loop deja de redibujar el bg original (condición `!finalBgAppliedRef.current`), la imagen final queda fija
+   - **En `handleSkip`**: se dibuja directamente sobre `bgCtx` — fondo rojo + imagen final + `drawSideColumns(isRevealed=true)` — sin depender del render loop
 
 2. **scratchCanvasRef** — Doctor Doom (se borra con `destination-out`)
    - `drawBrush()` de `Brush.ts` hace el borrado con gradiente radial soft-edge
@@ -213,7 +231,8 @@ export const TIMING = {
 | Hint duration | 2600ms | `useEffect` fase 0 |
 | Marketing delay | 400ms | `useEffect` isRevealed |
 | Marketing typewriter speed | 28 | `<TypewriterText speed={28}>` |
-| Final reveal duration | 4200ms | `const duration = 4200` en effect textComplete |
+| Final reveal duration | 5200ms | `const duration = 5200` en effect textComplete (con easing `p < 0.5 ? 2*p*p : 1 - Math.pow(-2*p+2, 2)/2`) |
+| Final reveal strokes | `4 + eased*44` | `Math.floor(4 + eased * 44)` en effect textComplete |
 | Header visible delay | 1700ms | `setTimeout(..., 1700)` en useEffect inicial |
 | Skip button show | 800ms | `setTimeout(..., 800)` en PhaseOverlays |
 
@@ -229,7 +248,9 @@ export const TIMING = {
 | Speed typewriter | `ScratchReveal.tsx` | `speed={28}` en TypewriterText |
 | Read delay typewriter | `scratch/types.ts` | `MARKETING_READ: 6500` |
 | Delay post-complete | `scratch/types.ts` | `MARKETING_FADE: 1800` |
-| Duración transición final | `ScratchReveal.tsx` | `const duration = 4200` |
+| Duración transición final | `ScratchReveal.tsx` | `const duration = 5200` (con easing) |
+| Strokes transición final | `ScratchReveal.tsx` | `Math.floor(4 + eased * 44)` |
+| Paredes en handleSkip | `ScratchReveal.tsx` | `drawSideColumns(bgCtx, w, h, imgLeft, imgRight, true, ...)` en `newBg.onload` |
 | Tamaño pincel | `InicioSection.astro` | `brushSize={140}` |
 | Colores columnas | `ScratchReveal.tsx` | `drawSideColumns()` líneas ~40-100 |
 | Throttle columnas | `scratch/types.ts` | `COL_THROTTLE: 33` |
@@ -259,7 +280,7 @@ Tres elementos renderizados condicionalmente:
 
 1. **Hint** (`showHint`): texto "Rasca la imagen" + svg de estrella, centrado, `hintPulse` animation 2.4s, `pointerEvents: none`
 2. **Marketing** (`showMarketing`): `<TypewriterText>` con mensaje de marketing, posicionado abajo-centro
-3. **Skip button** (`skipVisible && !skipped`): aparece 800ms tras hint, fade-out animado al hacer skip
+3. **Skip button** (`skipVisible && !skipped && !finalApplied`): aparece 800ms tras hint, permanece visible hasta que `finalApplied=true`, fade-out animado al hacer skip. Recibe prop `finalApplied` desde `ScratchReveal`.
 
 ---
 
@@ -316,22 +337,23 @@ Interactuar: clic + arrastrar para rascar. Botón "Saltar" abajo-centro para ski
 3. **`userInteractedRef`** debe ser `true` antes de revelar (evita reveals automáticos por hover)
 4. **Limpiar timers** en `handleSkip` y en cleanup de effects (`timersRef.current`)
 5. **`finalRevealRunningRef`** previene que la transición final se dispare dos veces
-6. **`finalBgAppliedRef`** evita redibujar el foreground tras aplicar la imagen final
-7. **DPR** — los canvases usan `devicePixelRatio`; respetar `setTransform(dpr,...)` al dibujar
-8. **Móvil** (`innerWidth < 768`) — sin columnas laterales; hint/marketing adaptados con `mobileHeader`
-9. **Bill requiere `billImage`** — `BillSequence` retorna `null` si no hay imagen
-10. **Sincronización tema** — `Header` recibe `isRevealed` y `getColors()` para cambiar paleta
+6. **`finalBgAppliedRef`** evita redibujar el foreground tras aplicar la imagen final — el render loop tiene `!finalBgAppliedRef.current` en la condición de dibujo del bg
+7. **`handleSkip` dibuja paredes post-reveal** — al saltar, `handleSkip` pinta fondo rojo + imagen final + `drawSideColumns(isRevealed=true)` directamente en `bgCtx` antes de `setFinalApplied(true)`. No modifica el render loop.
+8. **DPR** — los canvases usan `devicePixelRatio`; respetar `setTransform(dpr,...)` al dibujar
+9. **Móvil** (`innerWidth < 768`) — sin columnas laterales; hint/marketing adaptados con `mobileHeader`
+10. **Bill requiere `billImage`** — `BillSequence` retorna `null` si no hay imagen
+11. **Sincronización tema** — `Header` recibe `isRevealed` y `getColors()` para cambiar paleta
+12. **`getTransform()` llena 100% altura** — `y=0`, `scale=canvasH/imgH`; no queda espacio vacío inferior. Las paredes laterales rellenan el resto.
+13. **Skip button usa `finalApplied`** — condición `skipVisible && !skipped && !finalApplied`; el botón permanece visible hasta que la imagen final está aplicada
 
 ---
 
 ## Estado actual
 
-✅ Funcional: 5 fases sincrónicas, skip, hint, marketing typewriter, transición final programática, columnas rojo-dorado animadas, sweep text, Bill secuencia completa (corner + central + burbujas), header sincronizado, optimización INP, mobile responsive
-🔄 Pendiente: validar INP tras optimizaciones (<304ms objetivo)e dos veces
-6. **`finalBgAppliedRef`** evita redibujar el foreground tras aplicar la imagen final
-7. **DPR** — los canvases usan `devicePixelRatio`; respetar `setTransform(dpr,...)` al dibujar
-8. **Móvil** — sin columnas laterales (`if (!mobile)`); hint/marketing usan `mobileHeader`
-
-## Estado actual
-✅ Funcional: fases sincrónicas, skip, hint, marketing, transición final, columnas rojo-dorado, optimización INP
+✅ Funcional: 5 fases sincrónicas, skip, hint, marketing typewriter, transición final programática (5200ms con easing), columnas rojo-dorado animadas, sweep text, Bill secuencia completa (corner + central + burbujas), header sincronizado, optimización INP, mobile responsive
+✅ Imagen llena 100% de la altura del canvas (`getTransform` con `y=0`, `scale=canvasH/imgH`) — sin espacio vacío inferior
+✅ Imagen final permanece fija tras `finalApplied` (render loop deja de redibujar bg original vía `!finalBgAppliedRef.current`)
+✅ Skip button visible hasta `finalApplied` (condición `skipVisible && !skipped && !finalApplied`)
+✅ `handleSkip` dibuja paredes con colores post-reveal (rojo/dorado) directamente en canvas antes de `setFinalApplied` — transición verde→rojo instantánea al saltar
+✅ `canvasRenderer.ts` sin modificaciones (estado original, sincronización intacta)
 🔄 Pendiente: validar INP tras optimizaciones (<304ms objetivo)
