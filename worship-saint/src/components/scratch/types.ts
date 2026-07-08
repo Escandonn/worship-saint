@@ -79,11 +79,12 @@ export function getTransform(
   canvasH: number,
   mobile: boolean
 ): { x: number; y: number; scale: number } {
-  const targetH = mobile ? canvasH * 0.58 : canvasH * 0.82;
-  const scale = targetH / imgH;
+  // La imagen ocupa toda la altura (100vh), anclada arriba, sin espacio inferior
+  // El espacio restante a los lados lo ocupan las paredes laterales con colores del personaje
+  const scale = canvasH / imgH;
   const w = imgW * scale;
   const h = imgH * scale;
-  return { x: (canvasW - w) / 2, y: (canvasH - h) / 2, scale };
+  return { x: (canvasW - w) / 2, y: 0, scale };
 }
 
 // ── Side columns drawing ───────────────────────────────────────────────────────
@@ -97,58 +98,68 @@ export function drawSideColumns(
   elapsed: number,
   avgColor: { r: number; g: number; b: number } | null
 ) {
-  const colW = 28;
   const pulse = Math.sin(elapsed * 0.0018) * 0.18 + 0.82;
   const shimmer = Math.sin(elapsed * 0.003) * 0.12 + 0.88;
 
+  // 2 tipos de colores acorde al personaje:
+  // Pre-reveal (Doctor Doom — verde): base oscura + acento verde neón
+  // Post-reveal (Iron Man — rojo/dorado): base roja + acento dorado
   const baseColor = isRevealed ? COLORS.POST_BG : COLORS.PRE_BG;
+  const baseColor2 = isRevealed ? COLORS.POST_PRIMARY : COLORS.PRE_BG2;
   const accentColor = isRevealed ? COLORS.POST_ACCENT : COLORS.PRE_ACCENT;
 
-  // Columna izquierda
+  // Columna izquierda — ocupa todo el espacio desde el borde hasta la imagen
   if (imgLeft > 0) {
-    const grad = ctx.createLinearGradient(0, 0, colW, 0);
+    const leftW = imgLeft;
+
+    // Capa 1: gradiente base del personaje (2 tonos)
+    const grad = ctx.createLinearGradient(0, 0, leftW, 0);
     grad.addColorStop(0, baseColor);
+    grad.addColorStop(0.5, baseColor2);
     grad.addColorStop(1, 'transparent');
     ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, imgLeft, canvasH);
+    ctx.fillRect(0, 0, leftW, canvasH);
 
-    // Línea de acento
+    // Capa 2: línea de acento junto a la imagen (color del personaje)
     ctx.globalAlpha = pulse * 0.55;
     ctx.fillStyle = accentColor;
     ctx.fillRect(imgLeft - 2, 0, 2, canvasH);
     ctx.globalAlpha = 1;
 
-    // Gradiente de color vivo
+    // Capa 3: gradiente de color vivo (promedio de la imagen)
     if (avgColor) {
       ctx.globalAlpha = shimmer * 0.18;
-      const vividGrad = ctx.createLinearGradient(0, 0, imgLeft, 0);
+      const vividGrad = ctx.createLinearGradient(0, 0, leftW, 0);
       vividGrad.addColorStop(0, baseColor);
       vividGrad.addColorStop(1, `rgba(${avgColor.r},${avgColor.g},${avgColor.b},0.6)`);
       ctx.fillStyle = vividGrad;
-      ctx.fillRect(0, 0, imgLeft, canvasH);
+      ctx.fillRect(0, 0, leftW, canvasH);
       ctx.globalAlpha = 1;
     }
   }
 
-  // Columna derecha
+  // Columna derecha — ocupa todo el espacio desde la imagen hasta el borde
   if (imgRight < canvasW) {
     const rightW = canvasW - imgRight;
+
+    // Capa 1: gradiente base del personaje (2 tonos)
     const grad = ctx.createLinearGradient(canvasW, 0, canvasW - rightW, 0);
     grad.addColorStop(0, baseColor);
+    grad.addColorStop(0.5, baseColor2);
     grad.addColorStop(1, 'transparent');
     ctx.fillStyle = grad;
     ctx.fillRect(imgRight, 0, rightW, canvasH);
 
-    // Línea de acento
+    // Capa 2: línea de acento junto a la imagen (color del personaje)
     ctx.globalAlpha = pulse * 0.55;
     ctx.fillStyle = accentColor;
     ctx.fillRect(imgRight, 0, 2, canvasH);
     ctx.globalAlpha = 1;
 
-    // Gradiente de color vivo
+    // Capa 3: gradiente de color vivo (promedio de la imagen)
     if (avgColor) {
       ctx.globalAlpha = shimmer * 0.18;
-      const vividGrad = ctx.createLinearGradient(canvasW, 0, imgRight, 0);
+      const vividGrad = ctx.createLinearGradient(canvasW, 0, canvasW - rightW, 0);
       vividGrad.addColorStop(0, baseColor);
       vividGrad.addColorStop(1, `rgba(${avgColor.r},${avgColor.g},${avgColor.b},0.6)`);
       ctx.fillStyle = vividGrad;

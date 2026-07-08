@@ -2,7 +2,7 @@
 // Overlays de fase: hint, marketing typewriter, skip button
 // ─────────────────────────────────────────────────────────────────────────────
 import { useState, useEffect } from 'react';
-import { TypewriterText } from '../TypewriterText';
+import TypewriterText from '../TypewriterText';
 import { TIMING } from './types';
 
 interface PhaseOverlaysProps {
@@ -14,6 +14,8 @@ interface PhaseOverlaysProps {
   isRevealed: boolean;
   skipped: boolean;
   skipFading: boolean;
+  cinematicComplete: boolean;
+  finalApplied: boolean;
   handleSkip: () => void;
   onTypewriterComplete?: () => void;
 }
@@ -29,6 +31,8 @@ export function PhaseOverlays({
   isRevealed,
   skipped,
   skipFading,
+  cinematicComplete,
+  finalApplied,
   handleSkip,
   onTypewriterComplete,
 }: PhaseOverlaysProps) {
@@ -120,7 +124,7 @@ export function PhaseOverlays({
       )}
 
       {/* ── Skip button ── */}
-      {skipVisible && !skipped && (
+      {skipVisible && !skipped && !finalApplied && (
         <button
           type="button"
           onClick={handleSkip}

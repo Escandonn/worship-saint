@@ -211,7 +211,7 @@ export function useCanvasRenderer({
 
       // ── 2. Redibujar columnas laterales ──────────────────────────────────
       const forceCols = finalBgAppliedRef.current || needsRedrawRef.current;
-      if (imgsRef.current.bg && (needsRedraw || forceCols)) {
+      if (imgsRef.current.bg && (needsRedraw || forceCols) && !finalBgAppliedRef.current) {
         const shouldDrawCols = !mobile && (time - lastColDraw > TIMING.COL_THROTTLE);
         if (shouldDrawCols || drawing || forceCols) {
           lastColDraw = time;

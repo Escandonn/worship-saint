@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Bill Sequence: Bill corner + Bill central + sus burbujas de diálogo
 // ─────────────────────────────────────────────────────────────────────────────
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { TIMING } from './types';
 
 interface BillSequenceProps {
@@ -10,6 +10,7 @@ interface BillSequenceProps {
   billImage2?: string;
   billCentralImage?: string;
   mobileHeader: boolean;
+  onCinematicComplete?: () => void;
 }
 
 export function BillSequence({
@@ -18,12 +19,14 @@ export function BillSequence({
   billImage2,
   billCentralImage,
   mobileHeader,
+  onCinematicComplete,
 }: BillSequenceProps) {
   const [showBill, setShowBill] = useState(false);
   const [showBillBubble, setShowBillBubble] = useState(false);
   const [showBillCentral, setShowBillCentral] = useState(false);
   const [showBillCentralBubble, setShowBillCentralBubble] = useState(false);
   const [billFrame, setBillFrame] = useState(0);
+  const billFrameIntervalRef = useRef<number | null>(null);
 
   // ── Secuencia Bill corner ──────────────────────────────────────────────────
   useEffect(() => {
@@ -37,17 +40,30 @@ export function BillSequence({
   useEffect(() => {
     if (!showBillBubble || !billCentralImage) return;
     const t1 = window.setTimeout(() => setShowBillCentral(true), TIMING.BILL_CENTRAL_SHOW);
-    const t2 = window.setTimeout(() => setShowBillCentralBubble(true), TIMING.BILL_CENTRAL_BUBBLE);
+    const t2 = window.setTimeout(() => {
+      setShowBillCentralBubble(true);
+      onCinematicComplete?.();
+    }, TIMING.BILL_CENTRAL_BUBBLE);
     return () => { window.clearTimeout(t1); window.clearTimeout(t2); };
-  }, [showBillBubble, billCentralImage]);
+  }, [showBillBubble, billCentralImage, onCinematicComplete]);
 
   // ── Alternancia de frames de Bill (animación) ──────────────────────────────
+  // Bug 2b fix: usar ref dedicado para que el intervalo sobreviva a limpieza de timers del padre
   useEffect(() => {
     if (!showBill || !billImage2) return;
-    const interval = window.setInterval(() => {
+    // Limpiar interval anterior si existe
+    if (billFrameIntervalRef.current !== null) {
+      window.clearInterval(billFrameIntervalRef.current);
+    }
+    billFrameIntervalRef.current = window.setInterval(() => {
       setBillFrame(f => (f === 0 ? 1 : 0));
     }, TIMING.BILL_FRAME_INTERVAL);
-    return () => window.clearInterval(interval);
+    return () => {
+      if (billFrameIntervalRef.current !== null) {
+        window.clearInterval(billFrameIntervalRef.current);
+        billFrameIntervalRef.current = null;
+      }
+    };
   }, [showBill, billImage2]);
 
   if (!finalApplied || !billImage) return null;

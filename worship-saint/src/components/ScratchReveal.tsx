@@ -1,122 +1,17 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { usePointer } from './usePointer';
+// ─────────────────────────────────────────────────────────────────────────────
+// ScratchReveal — Orchestrator delgado que compone los módulos de scratch/
+//
+// Estado y lógica de orquestación aquí. Canvas, Header, Overlays y Bill
+// viven en sus respectivos archivos modulares.
+// ─────────────────────────────────────────────────────────────────────────────
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { drawBrush } from './Brush';
-import { ParticleSystem } from './Particles';
-import TypewriterText from './TypewriterText';
-
-interface ScratchRevealProps {
-  foreground: string;       // Doom ojos abiertos
-  midground: string;        // Doom ojos cerrados (transición)
-  background: string;       // Tony / Iron Man
-  afterReveal?: string;     // opcional: imagen a mostrar después del texto de rostro
-  billImage?: string;       // Bill — aparece en esquina inferior derecha con nube de diálogo
-  billImage2?: string;      // Bill frame 2 — para animación de movimiento
-  billCentralImage?: string; // Bill central — aparece de abajo arriba en el centro inferior
-  brushSize?: number;
-}
-
-/** Escala identica para todas las imágenes — object-contain PC / object-cover móvil */
-function getTransform(imgW: number, imgH: number, w: number, h: number, mobile: boolean) {
-  const scale = mobile ? Math.max(w / imgW, h / imgH) : Math.min(w / imgW, h / imgH);
-  return { scale, x: w / 2 - (imgW / 2) * scale, y: h / 2 - (imgH / 2) * scale };
-}
-
-/** Dibuja columnas laterales con gradiente temático en el bgCanvas */
-function drawSideColumns(
-  ctx: CanvasRenderingContext2D,
-  w: number,
-  h: number,
-  imgX: number,       // borde izq de la imagen
-  imgRight: number,   // borde der de la imagen
-  isRevealed: boolean,
-  t: number,          // tiempo animación 0-∞
-  avgColor?: { r: number; g: number; b: number } | null
-) {
-  const colW = Math.max(0, imgX); // ancho de cada columna lateral
-  if (colW < 2) return;           // en móvil no hay espacio
-
-  // Colores temáticos — rojo/dorado más vivos post-reveal
-  const primary   = isRevealed ? '#5C0000' : '#0a2a0a';
-  const secondary = isRevealed ? '#D4AF37' : '#2a6a2a';
-  const accent    = isRevealed ? '#FFD700' : '#00ff88';
-
-  // vividez: animación de la superposición dorada será calculada más abajo
-
-  // Pulso animado (sin CSS, solo con Math.sin)
-  const pulse = 0.15 + 0.08 * Math.sin(t * 0.002);
-
-  // Columna IZQUIERDA
-  const gl = ctx.createLinearGradient(0, 0, colW, 0);
-  gl.addColorStop(0,    primary);
-  gl.addColorStop(0.55, secondary);
-  gl.addColorStop(1,    'transparent');
-  ctx.fillStyle = gl;
-  ctx.fillRect(0, 0, colW, h);
-
-  // Línea de borde luminosa — izquierda
-  const elBorder = ctx.createLinearGradient(0, 0, 0, h);
-  elBorder.addColorStop(0,   'transparent');
-  elBorder.addColorStop(0.5, accent);
-  elBorder.addColorStop(1,   'transparent');
-  ctx.globalAlpha = 0.6 + pulse;
-  ctx.fillStyle = elBorder;
-  ctx.fillRect(colW - 2, 0, 2, h);
-
-  // Ornamentos verticales punteados — izquierda
-  ctx.globalAlpha = 0.35 + pulse;
-  ctx.fillStyle = accent;
-  for (let y = 20; y < h; y += 30) {
-    const r = 2 + 1.5 * Math.abs(Math.sin(y * 0.05 + t * 0.003));
-    ctx.beginPath();
-    ctx.arc(colW * 0.35, y, r, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  // Columna DERECHA (espejo)
-  const gr = ctx.createLinearGradient(imgRight, 0, w, 0);
-  gr.addColorStop(0,    'transparent');
-  gr.addColorStop(0.45, secondary);
-  gr.addColorStop(1,    primary);
-  ctx.globalAlpha = 1;
-  ctx.fillStyle = gr;
-  ctx.fillRect(imgRight, 0, w - imgRight, h);
-
-  // Línea de borde luminosa — derecha
-  const erBorder = ctx.createLinearGradient(0, 0, 0, h);
-  erBorder.addColorStop(0,   'transparent');
-  erBorder.addColorStop(0.5, accent);
-  erBorder.addColorStop(1,   'transparent');
-  ctx.globalAlpha = 0.6 + pulse;
-  ctx.fillStyle = erBorder;
-  ctx.fillRect(imgRight, 0, 2, h);
-
-  // Ornamentos verticales punteados — derecha
-  ctx.globalAlpha = 0.35 + pulse;
-  ctx.fillStyle = accent;
-  for (let y = 20; y < h; y += 30) {
-    const r = 2 + 1.5 * Math.abs(Math.sin(y * 0.05 + t * 0.003 + 1.5));
-    ctx.beginPath();
-    ctx.arc(imgRight + (w - imgRight) * 0.65, y, r, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  // Overlay sutil de dorado/amarillo para dar vividez (se mueve con pulse)
-  const yellow = { r: 255, g: 213, b: 74 }; // amarillo
-  const gold   = { r: 212, g: 175, b: 55 }; // dorado
-  const mix = (c1: any, c2: any, f: number) => `rgb(${Math.round(c1.r * (1 - f) + c2.r * f)}, ${Math.round(c1.g * (1 - f) + c2.g * f)}, ${Math.round(c1.b * (1 - f) + c2.b * f)})`;
-  const shimmerF = 0.5 + 0.5 * Math.sin(t * 0.002);
-  const shimmerStart = mix(yellow, gold, Math.max(0, shimmerF));
-  const shimmerEnd = mix(gold, yellow, Math.max(0, 1 - shimmerF));
-  const overlay = ctx.createLinearGradient(0, 0, colW, 0);
-  overlay.addColorStop(0,   shimmerStart);
-  overlay.addColorStop(0.5, shimmerEnd);
-  overlay.addColorStop(1,   'transparent');
-  ctx.globalAlpha = isRevealed ? (0.12 + 0.08 * Math.abs(Math.sin(t * 0.004))) : (0.06 + 0.06 * Math.abs(Math.sin(t * 0.004)));
-  ctx.fillStyle = overlay;
-  ctx.fillRect(0, 0, colW, h);
-  ctx.fillRect(imgRight, 0, w - imgRight, h);
-
-  ctx.globalAlpha = 1; // reset
-}
+import { useCanvasRenderer } from './scratch/canvasRenderer';
+import { Header } from './scratch/Header';
+import { PhaseOverlays } from './scratch/PhaseOverlays';
+import { BillSequence } from './scratch/BillSequence';
+import { drawSideColumns } from './scratch/types';
+import type { ScratchRevealProps, Phase } from './scratch/types';
 
 export default function ScratchReveal({
   foreground,
@@ -128,96 +23,79 @@ export default function ScratchReveal({
   billCentralImage,
   brushSize = 140,
 }: ScratchRevealProps) {
-  const containerRef     = useRef<HTMLDivElement>(null);
-  const bgCanvasRef      = useRef<HTMLCanvasElement>(null);  // Tony (fondo fijo)
-  const scratchCanvasRef = useRef<HTMLCanvasElement>(null);  // Doom (se raspa)
+  // ── Refs de canvas (compartidos con canvasRenderer) ────────────────────────
+  const containerRef = useRef<HTMLDivElement>(null);
+  const bgCanvasRef = useRef<HTMLCanvasElement>(null);
+  const scratchCanvasRef = useRef<HTMLCanvasElement>(null);
   const particlesCanvasRef = useRef<HTMLCanvasElement>(null);
 
-  const pointerState   = usePointer(containerRef);
-  const particleSystem = useRef(new ParticleSystem());
-  const avgColorRef = useRef<{ r: number; g: number; b: number } | null>(null);
-  const rafId          = useRef<number | null>(null);
-  const startTime      = useRef<number>(0); // para animación columnas
-  const lastTime       = useRef<number>(0);
+  // ── Refs internos para afterReveal animation ───────────────────────────────
+  const finalRevealRunningRef = useRef(false);
+  const timersRef = useRef<number[]>([]);
 
-  // Distancia rascada — porcentaje de revelación 0..1
-  const scratchProgress = useRef(0);       // 0 = Doom abierto, 1 = Tony
-  const isRevealedRef   = useRef(false);
+  // ── Estado de orquestación ─────────────────────────────────────────────────
+  const [phase, setPhase] = useState<Phase>(0);
   const [isRevealed, setIsRevealed] = useState(false);
-  // ── Fases sincrónicas: una sola cosa a la vez ──
-  // 0 = texto inicial "Rasca la imagen"
-  // 1 = usuario rasca (scratch activo)
-  // 2 = texto de marketing (typewriter)
-  // 3 = transición final programática
-  // 4 = completo (imagen final visible)
-  const [phase, setPhase] = useState(0);
+  const [finalApplied, setFinalApplied] = useState(false);
   const [showHint, setShowHint] = useState(true);
   const [showMarketing, setShowMarketing] = useState(false);
   const [textComplete, setTextComplete] = useState(false);
-  const [finalApplied, setFinalApplied] = useState(false);
-  const [showBill, setShowBill] = useState(false);
-  const [showBillBubble, setShowBillBubble] = useState(false);
-  const [billFrame, setBillFrame] = useState(0); // 0 = bill.jpg, 1 = bill-2.jpg
-  const [showBillCentral, setShowBillCentral] = useState(false);
-  const [showBillCentralBubble, setShowBillCentralBubble] = useState(false);
   const [skipped, setSkipped] = useState(false);
   const [skipFading, setSkipFading] = useState(false);
-  const timersRef = useRef<number[]>([]);
-  const finalBgAppliedRef = useRef(false);
-  const userInteractedRef = useRef(false);
-  const finalRevealRunningRef = useRef(false);
-  const needsRedrawRef = useRef(true); // forzar redraw desde fuera del loop
+  const [cinematicComplete, setCinematicComplete] = useState(false);
   const [headerVisible, setHeaderVisible] = useState(false);
   const [mobileHeader, setMobileHeader] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
 
+  // ── Callbacks estables (evitan re-renders del canvasRenderer) ──────────────
+  const handleRevealComplete = useCallback(() => {
+    setIsRevealed(true);
+    setPhase(2);
+  }, []);
+
+  const handleFinalApplied = useCallback(() => {
+    // canvasRenderer ya sincroniza finalBgAppliedRef internamente
+  }, []);
+
+  // ── Hook del canvas renderer ───────────────────────────────────────────────
+  useCanvasRenderer({
+    containerRef,
+    bgCanvasRef,
+    scratchCanvasRef,
+    particlesCanvasRef,
+    foreground,
+    midground: midground ?? foreground,
+    background,
+    brushSize,
+    isRevealed,
+    finalApplied,
+    onRevealComplete: handleRevealComplete,
+    onFinalApplied: handleFinalApplied,
+  });
+
+  // ── Detección móvil + visibilidad del header ───────────────────────────────
   useEffect(() => {
     const updateMobile = () => setMobileHeader(window.innerWidth < 768);
     updateMobile();
     window.addEventListener('resize', updateMobile);
-
     const headerTimeout = window.setTimeout(() => setHeaderVisible(true), 1700);
-
     return () => {
       window.removeEventListener('resize', updateMobile);
       window.clearTimeout(headerTimeout);
     };
   }, []);
 
-  // ── Fase 0: texto inicial "Rasca la imagen" → desaparece solo ──
+  // ── Fase 0: hint "Rasca la imagen" → desaparece solo ───────────────────────
   useEffect(() => {
     if (phase !== 0) return;
     const t = window.setTimeout(() => {
       setShowHint(false);
-      setPhase(1); // pasa a fase de rascado
+      setPhase(1);
     }, 2600);
     timersRef.current.push(t);
     return () => { window.clearTimeout(t); };
   }, [phase]);
 
-  // ── SKIP: salta toda la experiencia a la imagen final ──
-  const handleSkip = () => {
-    if (skipped || skipFading) return;
-    // Fade out rápido y luego saltar
-    setSkipFading(true);
-    const t = window.setTimeout(() => {
-      setSkipped(true);
-      timersRef.current.forEach(id => window.clearTimeout(id));
-      timersRef.current = [];
-      setShowHint(false);
-      setShowMarketing(false);
-      // forzar reveal + transición final
-      scratchProgress.current = 1;
-      isRevealedRef.current = true;
-      setIsRevealed(true);
-      setPhase(3);
-      setTextComplete(true);
-      userInteractedRef.current = true;
-    }, 300); // fade out rápido en 300ms
-    timersRef.current.push(t);
-  };
-
-  // ── Fase 2: al revelarse Tony, mostrar texto de marketing (sincrónico) ──
+  // ── Fase 2: al revelarse, mostrar marketing tras delay ─────────────────────
   useEffect(() => {
     if (!isRevealed || skipped) return;
     setPhase(2);
@@ -226,70 +104,67 @@ export default function ScratchReveal({
     return () => { window.clearTimeout(t); };
   }, [isRevealed, skipped]);
 
+  // ── afterReveal: animación programática de rascado para revelar nueva img ──
+  // Esta lógica vive en el orchestrator porque necesita acceso directo a los
+  // canvas elements y no pertenece al render loop del canvasRenderer.
   useEffect(() => {
     if (!textComplete || !afterReveal) return;
-    if (finalRevealRunningRef.current) return; // already animating
+    if (finalRevealRunningRef.current) return;
+
+    const bgCanvas = bgCanvasRef.current;
+    const scratchCanvas = scratchCanvasRef.current;
+    if (!bgCanvas || !scratchCanvas) return;
 
     const newBg = new Image();
     newBg.crossOrigin = 'anonymous';
     newBg.onload = () => {
-      // Start final reveal animation that uses destination-out strokes to reveal the new background
-      const bgCanvas = bgCanvasRef.current;
-      const scratchCanvas = scratchCanvasRef.current;
-      if (!bgCanvas || !scratchCanvas) {
-          imgsRef.current.bg = newBg;
-          finalBgAppliedRef.current = true;
-          needsRedrawRef.current = true;
-          try { initCanvasRef.current && initCanvasRef.current(); } catch (e) { /* noop */ }
-          setFinalApplied(true);
-          return;
-        }
+      const bgCtx = bgCanvas.getContext('2d', { alpha: false });
+      const scratchCtx = scratchCanvas.getContext('2d', { alpha: true });
+      if (!bgCtx || !scratchCtx) return;
 
-      // Draw new background immediately underneath
-      imgsRef.current.bg = newBg;
-      needsRedrawRef.current = true; // forzar redibujado de columnas
-      try { initCanvasRef.current && initCanvasRef.current(); } catch (e) { /* noop */ }
+      // Dibujar el nuevo fondo inmediatamente debajo del scratch canvas
+      const rect = bgCanvas.getBoundingClientRect();
+      const scale = rect.height / newBg.height;
+      const w = newBg.width * scale;
+      const h = newBg.height * scale;
+      const x = (rect.width - w) / 2;
+      const y = 0;
 
-      // Animate programmatic scratching to reveal the new bg
-      if (finalRevealRunningRef.current) return;
+      bgCtx.drawImage(newBg, x, y, w, h);
+
+      // Animar rascado programático para revelar el nuevo fondo
       finalRevealRunningRef.current = true;
 
-      const scratchCtx = scratchCanvas.getContext('2d', { alpha: true });
-      if (!scratchCtx) {
-        finalBgAppliedRef.current = true;
-        finalRevealRunningRef.current = false;
-        return;
-      }
-
-      const duration = 4200; // transición final más lenta y cinematográfica
+      const duration = 5200;
       const start = performance.now();
-      let rafIdLocal: number;
+      let rafIdLocal = 0;
 
       const step = () => {
         const now = performance.now();
         const elapsed = now - start;
         const p = Math.min(1, elapsed / duration);
 
-        // emit several synthetic brush strokes per frame, increasing with progress
-        const strokes = Math.floor(6 + p * 40);
+        // Easing suave: empieza lento, acelera, termina suave
+        const eased = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
+        const strokes = Math.floor(4 + eased * 44);
         for (let i = 0; i < strokes; i++) {
-          const rect = bgCanvas.getBoundingClientRect();
-          const x = Math.random() * rect.width;
-          const y = Math.random() * rect.height;
-          const lastX = x + (Math.random() - 0.5) * 40;
-          const lastY = y + (Math.random() - 0.5) * 40;
-          const fakeState = { x, y, lastX, lastY, speed: 120, isDrawing: true } as any;
-          // use existing drawBrush which uses destination-out
+          const sx = Math.random() * rect.width;
+          const sy = Math.random() * rect.height;
+          const fakeState = {
+            x: sx,
+            y: sy,
+            lastX: sx + (Math.random() - 0.5) * 40,
+            lastY: sy + (Math.random() - 0.5) * 40,
+            speed: 120,
+            isDrawing: true,
+          } as any;
           drawBrush(scratchCtx, fakeState, brushSize);
         }
 
         if (p < 1) {
           rafIdLocal = requestAnimationFrame(step);
         } else {
-          // finish: ensure canvas is cleared (fully reveal)
           scratchCtx.clearRect(0, 0, scratchCanvas.width, scratchCanvas.height);
-          finalBgAppliedRef.current = true;
-          needsRedrawRef.current = true; // forzar redibujado continuo de columnas
           setFinalApplied(true);
           finalRevealRunningRef.current = false;
         }
@@ -298,793 +173,139 @@ export default function ScratchReveal({
       rafIdLocal = requestAnimationFrame(step);
     };
     newBg.src = afterReveal;
-  }, [textComplete, afterReveal]);
+  }, [textComplete, afterReveal, brushSize]);
 
-  // ── Secuencia Bill: aparece solo al final de la última imagen ──
-  useEffect(() => {
-    if (!finalApplied || !billImage) return;
-    // Bill aparece
-    const t1 = window.setTimeout(() => setShowBill(true), 300);
-    // Nube de diálogo de Bill tras aparecer
-    const t2 = window.setTimeout(() => setShowBillBubble(true), 1400);
-    timersRef.current.push(t1, t2);
-    return () => { [t1, t2].forEach(t => window.clearTimeout(t)); };
-  }, [finalApplied, billImage]);
+  // ── SKIP: saltar toda la experiencia a la imagen final ──────────────────────
+  const handleSkip = useCallback(() => {
+    if (skipped || skipFading) return;
+    setSkipFading(true);
+    const t = window.setTimeout(() => {
+      setSkipped(true);
+      // Limpiar todos los timers pendientes
+      timersRef.current.forEach(id => window.clearTimeout(id));
+      timersRef.current = [];
+      setShowHint(false);
+      setShowMarketing(false);
+      setIsRevealed(true);
+      setPhase(3);
+      setTextComplete(true);
 
-  // ── Secuencia Bill Central: aparece después de la nube de Bill ──
-  useEffect(() => {
-    if (!showBillBubble || !billCentralImage) return;
-    // Bill central aparece de abajo arriba
-    const t1 = window.setTimeout(() => setShowBillCentral(true), 2000);
-    // Nube de diálogo de Bill central
-    const t2 = window.setTimeout(() => setShowBillCentralBubble(true), 3700);
-    timersRef.current.push(t1, t2);
-    return () => { [t1, t2].forEach(t => window.clearTimeout(t)); };
-  }, [showBillBubble, billCentralImage]);
+      // Dibujar la imagen final inmediatamente en el canvas de fondo
+      if (afterReveal) {
+        const bgCanvas = bgCanvasRef.current;
+        const scratchCanvas = scratchCanvasRef.current;
+        if (bgCanvas && scratchCanvas) {
+          const bgCtx = bgCanvas.getContext('2d', { alpha: false });
+          const scratchCtx = scratchCanvas.getContext('2d', { alpha: true });
+          if (bgCtx && scratchCtx) {
+            const newBg = new Image();
+            newBg.crossOrigin = 'anonymous';
+            newBg.onload = () => {
+              const rect = bgCanvas.getBoundingClientRect();
+              const scale = rect.height / newBg.height;
+              const w = newBg.width * scale;
+              const h = newBg.height * scale;
+              const x = (rect.width - w) / 2;
+              const y = 0;
 
-  // ── Alternancia de frames de Bill (sensación de movimiento) ──
-  useEffect(() => {
-    if (!showBill || !billImage2) return;
-    const interval = window.setInterval(() => {
-      setBillFrame(f => (f === 0 ? 1 : 0));
-    }, 500); // cambia cada 500ms
-    timersRef.current.push(interval as unknown as number);
-    return () => window.clearInterval(interval);
-  }, [showBill, billImage2]);
+              // Pintar fondo base post-reveal (rojo) en toda el canvas
+              bgCtx.fillStyle = '#3a0808';
+              bgCtx.fillRect(0, 0, rect.width, rect.height);
 
-  const imgsRef = useRef<{
-    bg: HTMLImageElement | null;
-    fg: HTMLImageElement | null;
-    mid: HTMLImageElement | null;
-  }>({ bg: null, fg: null, mid: null });
+              // Dibujar la imagen final centrada
+              bgCtx.drawImage(newBg, x, y, w, h);
 
-  // Bounding box de la imagen (para columnas)
-  const imgBoundsRef = useRef({ x: 0, right: 0, w: 0, h: 0 });
-  const initCanvasRef = useRef<(() => void) | null>(null);
+              // Dibujar paredes laterales con colores post-reveal (rojo/dorado)
+              drawSideColumns(bgCtx, rect.width, rect.height, x, x + w, true, performance.now(), null);
 
-  // compute average color of an image for lively side columns
-  const computeAverageColor = (img: HTMLImageElement | null) => {
-    try {
-      if (!img) return null;
-      const cw = 32, ch = 32;
-      const c = document.createElement('canvas');
-      c.width = cw; c.height = ch;
-      const ctx = c.getContext('2d');
-      if (!ctx) return null;
-      ctx.drawImage(img, 0, 0, cw, ch);
-      const data = ctx.getImageData(0, 0, cw, ch).data;
-      let r = 0, g = 0, b = 0, count = 0;
-      for (let i = 0; i < data.length; i += 4) {
-        const alpha = data[i + 3];
-        if (alpha === 0) continue;
-        r += data[i]; g += data[i + 1]; b += data[i + 2]; count++;
-      }
-      if (count === 0) return null;
-      return { r: Math.round(r / count), g: Math.round(g / count), b: Math.round(b / count) };
-    } catch (e) {
-      return null;
-    }
-  };
-
-  const renderPerLetter = (text: string) => {
-    return text.split('').map((ch, i) => (
-      <span key={`${text}-${i}`} className="sweep-letter" style={{ position: 'relative', display: 'inline-block', overflow: 'visible', marginRight: ch === ' ' ? '0.18em' : undefined }}>
-        <span style={{ position: 'relative', zIndex: 1 }}>{ch}</span>
-        <span className="sweep-bar" style={{ animationDelay: `${i * 0.07}s` }} />
-      </span>
-    ));
-  };
-
-  useEffect(() => {
-    const container      = containerRef.current;
-    const bgCanvas       = bgCanvasRef.current;
-    const scratchCanvas  = scratchCanvasRef.current;
-    const particlesCanvas= particlesCanvasRef.current;
-    if (!container || !bgCanvas || !scratchCanvas || !particlesCanvas) return;
-
-    const bgCtx       = bgCanvas.getContext('2d',       { alpha: false });
-    const scratchCtx  = scratchCanvas.getContext('2d',  { alpha: true  });
-    const particlesCtx= particlesCanvas.getContext('2d',{ alpha: true  });
-    if (!bgCtx || !scratchCtx || !particlesCtx) return;
-
-    let loaded = 0;
-    const onLoad = () => { loaded++; if (loaded === 3) initCanvas(); };
-
-    const bgImg  = new Image(); bgImg.crossOrigin  = 'anonymous';
-    const fgImg  = new Image(); fgImg.crossOrigin  = 'anonymous';
-    const midImg = new Image(); midImg.crossOrigin = 'anonymous';
-
-    bgImg.onload = () => {
-      imgsRef.current.bg = bgImg;
-      try { avgColorRef.current = computeAverageColor(bgImg); } catch (e) { avgColorRef.current = null; }
-      onLoad();
-    };
-    fgImg.onload  = () => { imgsRef.current.fg  = fgImg;  onLoad(); };
-    midImg.onload = () => { imgsRef.current.mid = midImg; onLoad(); };
-
-    bgImg.src  = background;
-    fgImg.src  = foreground;
-    midImg.src = midground;
-
-    const initCanvas = () => {
-      const rect   = container.getBoundingClientRect();
-      const dpr    = window.devicePixelRatio || 1;
-      const mobile = window.innerWidth < 768;
-
-      [bgCanvas, scratchCanvas, particlesCanvas].forEach(c => {
-        c.width  = rect.width  * dpr;
-        c.height = rect.height * dpr;
-      });
-      bgCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      scratchCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      particlesCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-      const { bg, fg } = imgsRef.current;
-
-      // Calcular bounds comunes (fg y bg comparten misma caja visual)
-      if (fg) {
-        const t = getTransform(fg.width, fg.height, rect.width, rect.height, mobile);
-        imgBoundsRef.current = {
-          x: t.x,
-          right: t.x + fg.width * t.scale,
-          w: rect.width,
-          h: rect.height,
-        };
-      }
-
-      // Pintar fondo — color según fase (verde pre-reveal, rojo post-reveal)
-      bgCtx.fillStyle = isRevealedRef.current ? '#3a0808' : '#030a03';
-      bgCtx.fillRect(0, 0, rect.width, rect.height);
-      if (bg) {
-        const t = getTransform(bg.width, bg.height, rect.width, rect.height, mobile);
-        bgCtx.drawImage(bg, t.x, t.y, bg.width * t.scale, bg.height * t.scale);
-      }
-
-      // Dibujar columnas laterales también en initCanvas (para que estén siempre presentes)
-      if (!mobile && imgBoundsRef.current.right > 0) {
-        const b = imgBoundsRef.current;
-        drawSideColumns(bgCtx, rect.width, rect.height, b.x, b.right, isRevealedRef.current, performance.now() - startTime.current, avgColorRef.current);
-      }
-
-      // Si la imagen final ya se aplicó, no redibujamos el foreground (evita volver a cubrir)
-      scratchCtx.clearRect(0, 0, rect.width, rect.height);
-      if (!finalBgAppliedRef.current && fg) {
-        scratchCtx.globalCompositeOperation = 'source-over';
-        scratchCtx.globalAlpha = 1;
-        const t = getTransform(fg.width, fg.height, rect.width, rect.height, mobile);
-        scratchCtx.drawImage(fg, t.x, t.y, fg.width * t.scale, fg.height * t.scale);
-      }
-    };
-
-    initCanvasRef.current = initCanvas;
-
-    startTime.current = performance.now();
-    lastTime.current  = startTime.current;
-
-    // ── Flags de actividad para evitar redibujar en idle ──
-    let needsRedraw = true;
-    let lastColDraw = 0;
-    const COL_THROTTLE = 33; // ~30fps para columnas animadas
-    // ── RENDER LOOP ─────────────────────────────────────────────────────────
-    const renderLoop = (time: number) => {
-      const dt      = time - lastTime.current;
-      lastTime.current = time;
-      const elapsed = time - startTime.current;
-      const state   = pointerState.current;
-      const rect    = container.getBoundingClientRect();
-      const mobile  = window.innerWidth < 768;
-      const { fg, mid } = imgsRef.current;
-      const dpr = window.devicePixelRatio || 1;
-
-      const hasParticles = particleSystem.current.particles.length > 0;
-      const drawing = state.isDrawing && state.x !== null && state.y !== null && state.lastX !== null && state.lastY !== null;
-
-      // Si no hay actividad, no redibujamos (ahorra CPU/GPU en idle)
-      // Pero si la imagen final está aplicada, seguimos redibujando columnas animadas
-      if (!needsRedraw && !needsRedrawRef.current && !drawing && !hasParticles && mobile) {
-        rafId.current = requestAnimationFrame(renderLoop);
-        return;
-      }
-
-      // ── 1. Rascado + tracking de progreso ─────────────────────────────────
-      if (drawing) {
-        const x = state.x ?? 0;
-        const y = state.y ?? 0;
-        const lastX = state.lastX ?? 0;
-        const lastY = state.lastY ?? 0;
-        const speed = state.speed ?? 0;
-        const dist = Math.sqrt((x - lastX) ** 2 + (y - lastY) ** 2);
-
-        // Progreso total: 0 → 1 (4500px de recorrido total)
-        scratchProgress.current = Math.min(1, scratchProgress.current + dist / 4500);
-
-        if (scratchProgress.current >= 1 && userInteractedRef.current && !isRevealedRef.current) {
-          isRevealedRef.current = true;
-          setIsRevealed(true);
-        }
-
-        const prog = scratchProgress.current;
-
-        if (prog < 0.5 && mid && fg) {
-          const alpha = prog / 0.5;
-          scratchCtx.globalCompositeOperation = 'source-over';
-          scratchCtx.globalAlpha = alpha;
-          const t = getTransform(mid.width, mid.height, rect.width, rect.height, mobile);
-          scratchCtx.drawImage(mid, t.x, t.y, mid.width * t.scale, mid.height * t.scale);
-          scratchCtx.globalAlpha = 1;
-        }
-
-        drawBrush(scratchCtx, state, brushSize);
-
-        // Partículas reducidas para rendimiento
-        const n = Math.max(0, Math.floor(speed / 6));
-        if (n > 0 || Math.random() > 0.7) {
-          particleSystem.current.emit(x, y, speed, Math.min(n || 1, 3));
-        }
-        if (dist > 2) userInteractedRef.current = true;
-        needsRedraw = true;
-      }
-
-      // ── 2. Redibujar columnas laterales animadas (throttle ~30fps) ──────
-      const bgCtx = bgCanvasRef.current?.getContext('2d', { alpha: false });
-      // Si la imagen final está aplicada, forzar redibujado continuo de columnas (animación)
-      const forceCols = finalBgAppliedRef.current || needsRedrawRef.current;
-      if (bgCtx && imgsRef.current.bg && (needsRedraw || forceCols)) {
-        const shouldDrawCols = !mobile && (time - lastColDraw > COL_THROTTLE);
-        if (shouldDrawCols || drawing || forceCols) {
-          lastColDraw = time;
-          const bg = imgsRef.current.bg;
-          bgCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-          bgCtx.fillStyle = isRevealedRef.current ? '#3a0808' : '#030a03';
-          bgCtx.fillRect(0, 0, rect.width, rect.height);
-
-          const t = getTransform(bg.width, bg.height, rect.width, rect.height, mobile);
-          bgCtx.drawImage(bg, t.x, t.y, bg.width * t.scale, bg.height * t.scale);
-
-          if (!mobile) {
-            const b = imgBoundsRef.current;
-            drawSideColumns(bgCtx, rect.width, rect.height, b.x, b.right, isRevealedRef.current, elapsed, avgColorRef.current);
+              scratchCtx.clearRect(0, 0, scratchCanvas.width, scratchCanvas.height);
+              setFinalApplied(true);
+            };
+            newBg.src = afterReveal;
           }
         }
+      } else {
+        setFinalApplied(true);
       }
+    }, 300);
+    timersRef.current.push(t);
+  }, [skipped, skipFading, afterReveal]);
 
-      // ── 3. Partículas ──────────────────────────────────────────────────────
-      if (hasParticles || drawing) {
-        particleSystem.current.updateAndDraw(particlesCtx, dt);
-      } else if (needsRedraw) {
-        // limpiar canvas de partículas si no hay actividad
-        particlesCtx.clearRect(0, 0, particlesCanvas.width, particlesCanvas.height);
-      }
+  // ── onTypewriterComplete: tras marketing, esperar y avanzar a fase 3 ────────
+  const handleTypewriterComplete = useCallback(() => {
+    if (textComplete) return;
+    const fadeT = window.setTimeout(() => {
+      setTextComplete(true);
+      setShowMarketing(false);
+      setPhase(3);
+    }, 1800);
+    timersRef.current.push(fadeT);
+  }, [textComplete]);
 
-      if (state.isDrawing) {
-        state.lastX = state.x;
-        state.lastY = state.y;
-      }
+  // ── onCinematicComplete: Bill central bubble mostrada ──────────────────────
+  const handleCinematicComplete = useCallback(() => {
+    setCinematicComplete(true);
+  }, []);
 
-      // Reset flag si no hay actividad (pero no si la imagen final está aplicada)
-      if (!drawing && !hasParticles && !finalBgAppliedRef.current) {
-        needsRedraw = false;
-      }
-      needsRedrawRef.current = false; // consumir el flag externo
-
-      rafId.current = requestAnimationFrame(renderLoop);
-    };
-
-    rafId.current = requestAnimationFrame(renderLoop);
-
-    let resizeTimer: number;
-    const onResize = () => { clearTimeout(resizeTimer); resizeTimer = window.setTimeout(initCanvas, 150); };
-    window.addEventListener('resize', onResize, { passive: true });
-
-    return () => {
-      window.removeEventListener('resize', onResize);
-      clearTimeout(resizeTimer);
-      if (rafId.current) cancelAnimationFrame(rafId.current);
-    };
-  }, [foreground, midground, background, brushSize, pointerState]);
-
-  // ── Temas visuales del header ──
-  const headerBg     = isRevealed ? 'rgba(120,8,8,0.88)'    : 'rgba(4,28,4,0.88)';
-  const headerBorder = isRevealed ? 'rgba(212,175,55,0.45)' : 'rgba(80,200,80,0.25)';
-  const headerGlow   = isRevealed ? '0 4px 32px rgba(200,0,0,0.35)' : '0 4px 32px rgba(0,100,0,0.3)';
-  const accentColor  = isRevealed ? '#D4AF37' : '#00ff88';
-  const textColor    = isRevealed ? '#F5E2A0' : '#C7FFCD';
-  const linkColor    = isRevealed ? '#F7E18C' : '#D4FFD6';
-
+  // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <div
       ref={containerRef}
-      className="absolute inset-0 w-full h-full overflow-hidden touch-none"
-      style={{ touchAction: 'none', background: 'transparent' }}
+      style={{
+        position: 'relative',
+        width: '100%',
+        height: '100%',
+        overflow: 'hidden',
+        background: isRevealed ? '#3a0808' : '#030a03',
+        transition: 'background 1.2s ease',
+      }}
     >
-      {/* ── Fase 0: Texto inicial centrado "Rasca la imagen" ── */}
-      {showHint && phase === 0 && (
-        <div style={{
-          position: 'absolute', inset: 0, zIndex: 54,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          pointerEvents: 'none', padding: '1rem',
-        }}>
-          <div style={{
-            padding: mobileHeader ? '0.9rem 1.4rem' : '1.1rem 1.8rem',
-            background: 'rgba(3, 10, 3, 0.82)',
-            border: `1px solid ${accentColor}`,
-            borderRadius: '18px',
-            boxShadow: `0 18px 60px rgba(0,0,0,0.55), 0 0 24px ${isRevealed ? 'rgba(212,175,55,0.25)' : 'rgba(0,255,136,0.18)'}`,
-            backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)',
-            animation: 'hintPulse 2.4s ease-in-out infinite',
-          }}>
-            <span style={{
-              fontFamily: "'Cinzel', serif",
-              fontSize: mobileHeader ? '1.05rem' : '1.25rem',
-              fontWeight: 700,
-              letterSpacing: '0.18em',
-              textTransform: 'uppercase',
-              color: textColor,
-              textShadow: `0 2px 12px ${isRevealed ? 'rgba(212,175,55,0.4)' : 'rgba(0,255,136,0.35)'}`,
-            }}>
-              Rasca la imagen
-            </span>
-          </div>
-          <style>{`@keyframes hintPulse { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(1.04);opacity:0.92} }`}</style>
-        </div>
-      )}
-
-      {/* ── Fase 2: Texto de marketing (sincrónico, centrado) ── */}
-      {showMarketing && phase === 2 && !textComplete && (
-        <div style={{
-          position: 'absolute', inset: 0, zIndex: 54,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          pointerEvents: 'none', padding: '1rem',
-        }}>
-          <div style={{
-            width: mobileHeader ? '90vw' : 'min(560px, 50vw)',
-            padding: mobileHeader ? '1.1rem 1.3rem' : '1.4rem 1.8rem',
-            background: 'rgba(26, 5, 5, 0.88)',
-            border: `1px solid ${accentColor}`,
-            borderRadius: '22px',
-            boxShadow: '0 28px 90px rgba(0,0,0,0.6), 0 0 32px rgba(212,175,55,0.2)',
-            backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)',
-          }}>
-            <TypewriterText
-              text="El mismo actor de Iron Man será Doctor Doom. Toca y descubre quién hay detrás."
-              speed={42}
-              readDelay={6500}
-              onComplete={() => {
-                if (!textComplete) {
-                  // Esperar un poco antes de ocultar el texto y avanzar
-                  const fadeT = window.setTimeout(() => {
-                    setTextComplete(true);
-                    setShowMarketing(false);
-                    setPhase(3);
-                  }, 1800);
-                  timersRef.current.push(fadeT);
-                }
-              }}
-              className="marketing-reveal"
-              style={{
-                position: 'static',
-                width: '100%',
-                minHeight: 'auto',
-                margin: 0,
-                fontFamily: "'Cinzel', serif",
-                fontSize: mobileHeader ? '0.95rem' : '1.1rem',
-                fontWeight: 700,
-                letterSpacing: '0.1em',
-                textAlign: 'center',
-                background: 'transparent',
-                padding: 0,
-                border: 'none',
-                boxShadow: 'none',
-                color: '#F5E2A0',
-              }}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* ── SKIP button (siempre visible hasta completar) ── */}
-      {!skipped && (
-        <button
-          type="button"
-          onClick={handleSkip}
-          aria-label="Saltar experiencia"
-          style={{
-            position: 'absolute',
-            bottom: mobileHeader ? '1.2rem' : '1.6rem',
-            right: mobileHeader ? '1.2rem' : '1.6rem',
-            zIndex: 60,
-            display: 'inline-flex', alignItems: 'center', gap: '0.5rem',
-            padding: mobileHeader ? '0.6rem 1rem' : '0.7rem 1.2rem',
-            fontFamily: "'Cinzel', serif",
-            fontSize: mobileHeader ? '0.72rem' : '0.78rem',
-            fontWeight: 700,
-            letterSpacing: '0.18em',
-            textTransform: 'uppercase',
-            color: textColor,
-            background: 'rgba(0, 0, 0, 0.6)',
-            border: `1px solid ${accentColor}`,
-            borderRadius: '999px',
-            cursor: 'pointer',
-            backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)',
-            boxShadow: `0 6px 24px rgba(0,0,0,0.4)`,
-            transition: skipFading ? 'opacity 0.3s ease, transform 0.3s ease' : 'transform 0.2s ease, background 0.2s ease',
-            opacity: skipFading ? 0 : 1,
-            transform: skipFading ? 'scale(0.85)' : 'scale(1)',
-          }}
-          onMouseEnter={e => { if (!skipFading) { (e.currentTarget as HTMLElement).style.transform = 'scale(1.05)'; (e.currentTarget as HTMLElement).style.background = 'rgba(0,0,0,0.8)'; } }}
-          onMouseLeave={e => { if (!skipFading) { (e.currentTarget as HTMLElement).style.transform = 'scale(1)'; (e.currentTarget as HTMLElement).style.background = 'rgba(0,0,0,0.6)'; } }}
-        >
-          Saltar ✕
-        </button>
-      )}
-
-      {/* ── HEADER ── */}
-      
-      <header style={{
-        position: 'absolute', top: 0, left: 0, width: '100%', zIndex: 50,
-        padding: mobileHeader ? '14px 18px' : '12px 20px',
-        display: 'flex', flexDirection: 'column', gap: mobileHeader ? '0.85rem' : '0.75rem',
-        alignItems: 'center',
-        backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
-        backgroundColor: headerBg,
-        borderBottom: `1px solid ${headerBorder}`,
-        boxShadow: headerGlow,
-        transition: 'background-color 1.2s ease, box-shadow 1.2s ease, border-color 1.2s ease, padding 0.3s ease',
-        // sweep colors: --sweep-color-1 (accent), --sweep-color-2 (highlight)
-        ...(finalApplied ? { ['--sweep-color-1' as any]: '#FFD27A', ['--sweep-color-2' as any]: '#FFFFFF' } as React.CSSProperties : { ['--sweep-color-1' as any]: '#9CFFB8', ['--sweep-color-2' as any]: '#FFFFFF' } as React.CSSProperties),
-      }}>
-          <div style={{
-            width: '100%', maxWidth: '1260px', display: 'flex', alignItems: 'center',
-            justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap',
-            opacity: headerVisible ? 1 : 0,
-            transform: headerVisible ? 'translateY(0)' : 'translateY(-12px)',
-            transition: 'opacity 0.7s ease, transform 0.7s ease',
-          }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.72rem' }}>
-            <span aria-hidden="true" style={{
-              display: 'inline-block', width: '16px', height: '16px', background: accentColor,
-              clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)', transform: 'translateY(-1px)',
-            }} />
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.05rem' }}>
-              <style>{`
-                .sweep-text { position: relative; display: inline-block; overflow: hidden; }
-                .sweep-text .sweep-bar { position: absolute; left: -160%; top: -10%; height: 120%; width: 160%;
-                  background: linear-gradient(90deg, transparent 0%, var(--sweep-color-1, rgba(255,255,255,0.95)) 45%, var(--sweep-color-2, rgba(255,255,255,0.6)) 55%, transparent 100%);
-                  transform: skewX(-18deg);
-                  pointer-events: none; opacity: 0.95; }
-                @keyframes sweepLR { from { left: -160%; } to { left: 160%; } }
-                .sweep-on .sweep-bar { animation: sweepLR 1.6s ease-in-out forwards; }
-              `}</style>
-              <span className={headerVisible ? 'sweep-text sweep-on' : 'sweep-text'} style={{
-                color: textColor,
-                fontFamily: "'Cinzel', serif",
-                fontSize: mobileHeader ? '0.82rem' : '0.8rem',
-                fontWeight: 700,
-                letterSpacing: '0.24em',
-                textTransform: 'uppercase',
-                textShadow: isRevealed
-                  ? '0 0 16px rgba(212,175,55,0.6), 0 0 32px rgba(212,175,55,0.3)'
-                  : '0 0 16px rgba(0,255,136,0.5), 0 0 32px rgba(0,255,136,0.25)',
-              }}>
-                Worship-Saint
-                <span className="sweep-bar" />
-              </span>
-              <span className={headerVisible ? 'sweep-text sweep-on' : 'sweep-text'} style={{
-                color: accentColor,
-                fontFamily: "'Cinzel', serif",
-                fontSize: mobileHeader ? '0.62rem' : '0.64rem',
-                fontWeight: 700,
-                letterSpacing: '0.24em',
-                textTransform: 'uppercase',
-                textShadow: isRevealed
-                  ? '0 0 12px rgba(212,175,55,0.5), 0 0 24px rgba(212,175,55,0.25)'
-                  : '0 0 12px rgba(0,255,136,0.4), 0 0 24px rgba(0,255,136,0.2)',
-              }}>
-                Estudio de impacto
-                <span className="sweep-bar" />
-              </span>
-            </div>
-          </div>
-
-          {mobileHeader ? (
-            <button
-              type="button"
-              aria-label={menuOpen ? 'Cerrar menú' : 'Abrir menú'}
-              aria-expanded={menuOpen}
-              onClick={() => setMenuOpen(prev => !prev)}
-              style={{
-                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                width: '42px', height: '42px', borderRadius: '999px',
-                border: `1px solid ${linkColor}`, background: 'rgba(255,255,255,0.06)',
-                color: linkColor, cursor: 'pointer', transition: 'transform 0.2s ease',
-              }}
-            >
-              <span style={{
-                width: '20px', height: '2px', background: linkColor, display: 'block',
-                boxShadow: `0 -6px 0 ${linkColor}, 0 6px 0 ${linkColor}`,
-                transform: menuOpen ? 'rotate(90deg)' : 'none',
-                transition: 'transform 0.2s ease',
-              }} />
-            </button>
-          ) : (
-            <nav aria-label="Navegación principal" style={{
-              display: 'flex', flexWrap: 'wrap', gap: '1rem', justifyContent: 'flex-end', alignItems: 'center',
-            }}>
-              {[
-                { label: 'Inicio', href: '#inicio' },
-                { label: 'Nuestras obras', href: '#nuestras-obras' },
-                { label: 'Quiénes somos', href: '#quienes-somos' },
-                { label: 'Servicios', href: '#servicios' },
-              ].map(link => (
-                <a
-                  key={link.href}
-                  href={link.href}
-                  style={{
-                    color: linkColor,
-                    fontFamily: "'Cinzel', serif",
-                    fontSize: '0.82rem',
-                    fontWeight: 700,
-                    letterSpacing: '0.18em',
-                    textTransform: 'uppercase',
-                    textDecoration: 'none',
-                    transition: 'color 0.25s ease',
-                    textShadow: isRevealed
-                      ? '0 0 10px rgba(212,175,55,0.4)'
-                      : '0 0 10px rgba(0,255,136,0.3)',
-                  }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = '#ffffff'; }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = linkColor; }}
-                >
-                  {link.label}
-                </a>
-              ))}
-            </nav>
-          )}
-        </div>
-
-      </header>
-
-      {mobileHeader && menuOpen && headerVisible && (
-        <nav aria-label="Menú móvil" style={{
-          position: 'absolute', top: mobileHeader ? '72px' : '60px', right: 18, left: 18,
-          zIndex: 51, display: 'flex', flexDirection: 'column', gap: '0.75rem',
-          padding: '1rem', background: 'rgba(0,0,0,0.72)', borderRadius: '18px',
-          border: `1px solid ${linkColor}`, backdropFilter: 'blur(14px)',
-          boxShadow: '0 18px 50px rgba(0,0,0,0.25)',
-          transition: 'opacity 0.25s ease',
-        }}>
-          {[
-            { label: 'Inicio', href: '#inicio' },
-            { label: 'Nuestras obras', href: '#nuestras-obras' },
-            { label: 'Quiénes somos', href: '#quienes-somos' },
-            { label: 'Servicios', href: '#servicios' },
-          ].map(link => (
-            <a
-              key={link.href}
-              href={link.href}
-              onClick={() => setMenuOpen(false)}
-              style={{
-                color: linkColor,
-                fontFamily: "'Cinzel', serif",
-                fontSize: '0.96rem',
-                fontWeight: 700,
-                textTransform: 'uppercase',
-                textDecoration: 'none',
-                padding: '0.9rem 1rem',
-                borderRadius: '14px',
-                background: 'rgba(255,255,255,0.04)',
-                transition: 'background 0.25s ease',
-                textShadow: isRevealed
-                  ? '0 0 10px rgba(212,175,55,0.4)'
-                  : '0 0 10px rgba(0,255,136,0.3)',
-              }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.08)'; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.04)'; }}
-            >
-              {link.label}
-            </a>
-          ))}
-        </nav>
-      )}
-
-      {/* ── Canvas fondo (Tony + columnas) — zIndex 1 ── */}
-      <canvas ref={bgCanvasRef}
-        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', display: 'block', zIndex: 1 }}
+      {/* ── Canvas layers ── */}
+      <canvas
+        ref={bgCanvasRef}
+        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', zIndex: 1 }}
+      />
+      <canvas
+        ref={scratchCanvasRef}
+        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', zIndex: 10, cursor: 'crosshair' }}
+      />
+      <canvas
+        ref={particlesCanvasRef}
+        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', zIndex: 20, pointerEvents: 'none' }}
       />
 
-      {/* ── Canvas Doom (se raspa) — zIndex 10 ── */}
-      <canvas ref={scratchCanvasRef}
-        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', display: 'block', zIndex: 10, pointerEvents: 'none' }}
+      {/* ── Header ── */}
+      <Header
+        isRevealed={isRevealed}
+        headerVisible={headerVisible}
+        mobileHeader={mobileHeader}
       />
 
-      {/* ── Canvas Partículas — zIndex 20 ── */}
-      <canvas ref={particlesCanvasRef}
-        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', display: 'block', zIndex: 20, pointerEvents: 'none' }}
+      {/* ── Overlays: hint, marketing, skip ── */}
+      <PhaseOverlays
+        phase={phase}
+        showHint={showHint}
+        showMarketing={showMarketing}
+        textComplete={textComplete}
+        mobileHeader={mobileHeader}
+        isRevealed={isRevealed}
+        skipped={skipped}
+        skipFading={skipFading}
+        cinematicComplete={cinematicComplete}
+        finalApplied={finalApplied}
+        handleSkip={handleSkip}
+        onTypewriterComplete={handleTypewriterComplete}
       />
 
-      {/* ── Bill (esquina inferior derecha) con nube de diálogo — zIndex 30 ── */}
-      {finalApplied && billImage && (
-        <>
-          <style>{`
-            @keyframes billSlideIn {
-              0% { transform: translateY(40px) scale(0.7); opacity: 0; }
-              60% { transform: translateY(-6px) scale(1.05); opacity: 1; }
-              100% { transform: translateY(0) scale(1); opacity: 1; }
-            }
-            @keyframes bubblePopIn {
-              0% { transform: scale(0.3) translateY(10px); opacity: 0; }
-              50% { transform: scale(1.08) translateY(-4px); opacity: 1; }
-              100% { transform: scale(1) translateY(0); opacity: 1; }
-            }
-            @keyframes bubbleFloat {
-              0%, 100% { transform: translateY(0); }
-              50% { transform: translateY(-4px); }
-            }
-            @keyframes billFrameSwap {
-              0% { opacity: 1; }
-              45% { opacity: 0.3; }
-              50% { opacity: 0; }
-              55% { opacity: 0.3; }
-              100% { opacity: 1; }
-            }
-          `}</style>
-
-          {/* Bill personaje — más grande, alterna entre bill.jpg y bill-2.jpg */}
-          {showBill && (
-            <div style={{
-              position: 'absolute',
-              bottom: mobileHeader ? '0' : '0.5rem',
-              right: mobileHeader ? '0' : '1rem',
-              zIndex: 30,
-              width: mobileHeader ? '160px' : '240px',
-              height: mobileHeader ? '160px' : '240px',
-              animation: 'billSlideIn 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards',
-              pointerEvents: 'none',
-            }}>
-              <img
-                src={billImage}
-                alt="Bill"
-                style={{
-                  position: 'absolute',
-                  inset: 0,
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'contain',
-                  filter: 'drop-shadow(0 6px 20px rgba(0,0,0,0.5))',
-                  opacity: billFrame === 0 ? 1 : 0,
-                  transition: 'opacity 0.2s ease-in-out',
-                }}
-              />
-              {billImage2 && (
-                <img
-                  src={billImage2}
-                  alt="Bill"
-                  style={{
-                    position: 'absolute',
-                    inset: 0,
-                    width: '100%',
-                    height: '100%',
-                    objectFit: 'contain',
-                    filter: 'drop-shadow(0 6px 20px rgba(0,0,0,0.5))',
-                    opacity: billFrame === 1 ? 1 : 0,
-                    transition: 'opacity 0.2s ease-in-out',
-                  }}
-                />
-              )}
-            </div>
-          )}
-
-          {/* Nube de diálogo de Bill */}
-          {showBillBubble && (
-            <div style={{
-              position: 'absolute',
-              bottom: mobileHeader ? '8.5rem' : '13rem',
-              right: mobileHeader ? '6rem' : '10rem',
-              zIndex: 31,
-              maxWidth: mobileHeader ? '200px' : '280px',
-              padding: mobileHeader ? '0.7rem 1rem' : '0.9rem 1.3rem',
-              background: 'rgba(255, 255, 255, 0.96)',
-              borderRadius: '18px',
-              boxShadow: '0 8px 30px rgba(0,0,0,0.35), 0 0 16px rgba(212,175,55,0.2)',
-              fontFamily: "'Cinzel', serif",
-              fontSize: mobileHeader ? '0.72rem' : '0.85rem',
-              fontWeight: 700,
-              color: '#3a0808',
-              lineHeight: 1.4,
-              animation: 'bubblePopIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards, bubbleFloat 3s ease-in-out 0.5s infinite',
-              pointerEvents: 'none',
-            }}>
-              <span style={{ color: '#5C0000', fontWeight: 800 }}>¡Hola! Soy Bill</span>
-              <br />
-              <span style={{ color: '#7a1010' }}>y soy la que te explicará todo</span>
-              {/* Cola de la nube */}
-              <div style={{
-                position: 'absolute',
-                bottom: '-10px',
-                right: mobileHeader ? '12px' : '20px',
-                width: '0',
-                height: '0',
-                borderLeft: '10px solid transparent',
-                borderRight: '10px solid transparent',
-                borderTop: '12px solid rgba(255, 255, 255, 0.96)',
-              }} />
-            </div>
-          )}
-
-          {/* ── Bill Central (centro inferior) — aparece de abajo arriba ── */}
-          {showBillCentral && billCentralImage && (
-            <div style={{
-              position: 'absolute',
-              bottom: mobileHeader ? '0' : '0',
-              left: '50%',
-              transform: 'translateX(-50%)',
-              zIndex: 30,
-              width: mobileHeader ? '140px' : '200px',
-              height: mobileHeader ? '140px' : '200px',
-              animation: 'billSlideIn 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards',
-              pointerEvents: 'none',
-            }}>
-              <img
-                src={billCentralImage}
-                alt="Bill Central"
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'contain',
-                  filter: 'drop-shadow(0 6px 20px rgba(0,0,0,0.5))',
-                }}
-              />
-            </div>
-          )}
-
-          {/* Nube de diálogo de Bill Central */}
-          {showBillCentralBubble && (
-            <div style={{
-              position: 'absolute',
-              bottom: mobileHeader ? '10rem' : '14rem',
-              left: '50%',
-              transform: 'translateX(-50%)',
-              zIndex: 31,
-              maxWidth: mobileHeader ? '240px' : '360px',
-              padding: mobileHeader ? '0.8rem 1.1rem' : '1rem 1.5rem',
-              background: 'rgba(255, 255, 255, 0.96)',
-              borderRadius: '18px',
-              boxShadow: '0 8px 30px rgba(0,0,0,0.35), 0 0 16px rgba(212,175,55,0.2)',
-              fontFamily: "'Cinzel', serif",
-              fontSize: mobileHeader ? '0.7rem' : '0.82rem',
-              fontWeight: 700,
-              color: '#3a0808',
-              lineHeight: 1.5,
-              textAlign: 'center',
-              animation: 'bubblePopIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards, bubbleFloat 3s ease-in-out 0.5s infinite',
-              pointerEvents: 'none',
-            }}>
-              <span style={{ color: '#5C0000', fontWeight: 800 }}>¡Worship es una entidad de estudio</span>
-              <br />
-              <span style={{ color: '#7a1010' }}>que desarrolla páginas web y software de calidad.</span>
-              <br />
-              <span style={{ color: '#5C0000', fontWeight: 800 }}>Tiene su tienda de ecommerces</span>
-              <br />
-              <span style={{ color: '#7a1010' }}>y financia su club de fútbol.</span>
-              <br />
-              <span style={{ color: '#5C0000', fontWeight: 800 }}>Seguimos las enseñanzas de nuestro maestro Samuel.</span>
-              {/* Cola de la nube */}
-              <div style={{
-                position: 'absolute',
-                bottom: '-10px',
-                left: '50%',
-                transform: 'translateX(-50%)',
-                width: '0',
-                height: '0',
-                borderLeft: '10px solid transparent',
-                borderRight: '10px solid transparent',
-                borderTop: '12px solid rgba(255, 255, 255, 0.96)',
-              }} />
-            </div>
-          )}
-        </>
-      )}
+      {/* ── Bill Sequence ── */}
+      <BillSequence
+        finalApplied={finalApplied}
+        billImage={billImage}
+        billImage2={billImage2}
+        billCentralImage={billCentralImage}
+        mobileHeader={mobileHeader}
+        onCinematicComplete={handleCinematicComplete}
+      />
     </div>
   );
 }
