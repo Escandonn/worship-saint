@@ -37,7 +37,7 @@ export const TIMING = {
   BILL_CENTRAL_SHOW: 2000, // cuándo aparece Bill central tras burbuja Bill
   BILL_CENTRAL_BUBBLE: 3700,// cuándo aparece burbuja de Bill central
   BILL_FRAME_INTERVAL: 500,// alternancia de frames de Bill (ms)
-  BILL_CENTRAL_BLINK_INTERVAL: 700, // intervalo de parpadeo de Bill central (ms)
+  BILL_CENTRAL_BLINK_INTERVAL: 2000, // intervalo de parpadeo de Bill central (ms)
   // Scratch
   SCRATCH_TOTAL_DIST: 4500,// distancia total para revelar (px)
   COL_THROTTLE: 33,         // throttle columnas (~30fps)
