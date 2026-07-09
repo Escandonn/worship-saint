@@ -9,6 +9,7 @@ interface BillSequenceProps {
   billImage?: string;
   billImage2?: string;
   billCentralImage?: string;
+  billCentralImage2?: string;
   mobileHeader: boolean;
   onCinematicComplete?: () => void;
 }
@@ -18,6 +19,7 @@ export function BillSequence({
   billImage,
   billImage2,
   billCentralImage,
+  billCentralImage2,
   mobileHeader,
   onCinematicComplete,
 }: BillSequenceProps) {
@@ -26,8 +28,10 @@ export function BillSequence({
   const [showBillCentral, setShowBillCentral] = useState(false);
   const [showBillCentralBubble, setShowBillCentralBubble] = useState(false);
   const [billFrame, setBillFrame] = useState(0);
+  const [billCentralFrame, setBillCentralFrame] = useState(0);
   const [billFading, setBillFading] = useState(false);
   const billFrameIntervalRef = useRef<number | null>(null);
+  const billCentralBlinkRef = useRef<number | null>(null);
 
   // ══════════════════════════════════════════════════════════════════════════
   // CONFIGURACIÓN DE BILL CORNER (esquina inferior derecha) — Modifica estos valores
@@ -145,6 +149,25 @@ export function BillSequence({
       }
     };
   }, [showBill, billImage2, billFading]);
+
+  // ── Parpadeo de Bill central (alternancia entre abierto y cerrado) ──────────
+  useEffect(() => {
+    if (!showBillCentral || !billCentralImage2) return;
+    // Limpiar interval anterior si existe
+    if (billCentralBlinkRef.current !== null) {
+      window.clearInterval(billCentralBlinkRef.current);
+      billCentralBlinkRef.current = null;
+    }
+    billCentralBlinkRef.current = window.setInterval(() => {
+      setBillCentralFrame(f => (f === 0 ? 1 : 0));
+    }, TIMING.BILL_CENTRAL_BLINK_INTERVAL);
+    return () => {
+      if (billCentralBlinkRef.current !== null) {
+        window.clearInterval(billCentralBlinkRef.current);
+        billCentralBlinkRef.current = null;
+      }
+    };
+  }, [showBillCentral, billCentralImage2]);
 
   if (!finalApplied || !billImage) return null;
 
@@ -269,11 +292,28 @@ export function BillSequence({
             src={billCentralImage}
             alt="Bill Central"
             style={{
+              position: 'absolute', inset: 0,
               width: '100%', height: '100%',
               objectFit: 'contain',
               filter: 'drop-shadow(0 6px 20px rgba(0,0,0,0.5))',
+              opacity: billCentralFrame === 0 ? 1 : 0,
+              transition: 'opacity 0.08s ease-in-out',
             }}
           />
+          {billCentralImage2 && (
+            <img
+              src={billCentralImage2}
+              alt="Bill Central"
+              style={{
+                position: 'absolute', inset: 0,
+                width: '100%', height: '100%',
+                objectFit: 'contain',
+                filter: 'drop-shadow(0 6px 20px rgba(0,0,0,0.5))',
+                opacity: billCentralFrame === 1 ? 1 : 0,
+                transition: 'opacity 0.08s ease-in-out',
+              }}
+            />
+          )}
         </div>
       )}
 
