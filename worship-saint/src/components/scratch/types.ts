@@ -31,13 +31,13 @@ export const TIMING = {
   FINAL_ANIM: 600,          // duración de la animación final
   SKIP_FADE: 300,           // fade out del botón skip
   // Bill corner
-  BILL_SHOW: 300,           // cuándo aparece Bill tras finalApplied
-  BILL_BUBBLE: 1400,        // cuándo aparece burbuja de Bill
+  BILL_SHOW: 150,           // cuándo aparece Bill tras finalApplied
+  BILL_BUBBLE: 700,         // cuándo aparece burbuja de Bill
   // Bill central
-  BILL_CENTRAL_SHOW: 2000, // cuándo aparece Bill central tras burbuja Bill
-  BILL_CENTRAL_BUBBLE: 3700,// cuándo aparece burbuja de Bill central
-  BILL_FRAME_INTERVAL: 500,// alternancia de frames de Bill (ms)
-  BILL_CENTRAL_BLINK_INTERVAL: 2000, // intervalo de parpadeo de Bill central (ms)
+  BILL_CENTRAL_SHOW: 1000, // cuándo aparece Bill central tras burbuja Bill
+  BILL_CENTRAL_BUBBLE: 2000,// cuándo aparece burbuja de Bill central
+  BILL_FRAME_INTERVAL: 400,// alternancia de frames de Bill (ms)
+  BILL_CENTRAL_BLINK_INTERVAL: 1500, // intervalo de parpadeo de Bill central (ms)
   // Scratch
   SCRATCH_TOTAL_DIST: 4500,// distancia total para revelar (px)
   COL_THROTTLE: 33,         // throttle columnas (~30fps)

@@ -85,7 +85,7 @@ export default function ScratchReveal({
     };
   }, []);
 
-  // ── Fase 0: hint "Rasca la imagen" → desaparece solo ───────────────────────
+  // ── Fase 0: hint "Rasca la imagen" → desaparece solo o al primer rascado ──
   useEffect(() => {
     if (phase !== 0) return;
     const t = window.setTimeout(() => {
@@ -94,6 +94,18 @@ export default function ScratchReveal({
     }, 2600);
     timersRef.current.push(t);
     return () => { window.clearTimeout(t); };
+  }, [phase]);
+
+  // ── Ocultar hint inmediatamente al detectar el primer rascado del usuario ──
+  useEffect(() => {
+    const scratchCanvas = scratchCanvasRef.current;
+    if (!scratchCanvas || phase !== 0) return;
+    const hideHint = () => {
+      setShowHint(false);
+      setPhase(1);
+    };
+    scratchCanvas.addEventListener('pointerdown', hideHint, { once: true });
+    return () => scratchCanvas.removeEventListener('pointerdown', hideHint);
   }, [phase]);
 
   // ── Fase 2: al revelarse, mostrar marketing tras delay ─────────────────────
@@ -136,7 +148,7 @@ export default function ScratchReveal({
       // Animar rascado programático para revelar el nuevo fondo
       finalRevealRunningRef.current = true;
 
-      const duration = 5200;
+      const duration = 2800;
       const start = performance.now();
       let rafIdLocal = 0;
 
@@ -179,17 +191,17 @@ export default function ScratchReveal({
   // ── SKIP: saltar toda la experiencia a la imagen final ──────────────────────
   const handleSkip = useCallback(() => {
     if (skipped || skipFading) return;
+    // Ocultar botón e hint inmediatamente, sin delay
     setSkipFading(true);
-    const t = window.setTimeout(() => {
-      setSkipped(true);
-      // Limpiar todos los timers pendientes
-      timersRef.current.forEach(id => window.clearTimeout(id));
-      timersRef.current = [];
-      setShowHint(false);
-      setShowMarketing(false);
-      setIsRevealed(true);
-      setPhase(3);
-      setTextComplete(true);
+    setSkipped(true);
+    setShowHint(false);
+    setShowMarketing(false);
+    // Limpiar todos los timers pendientes
+    timersRef.current.forEach(id => window.clearTimeout(id));
+    timersRef.current = [];
+    setIsRevealed(true);
+    setPhase(3);
+    setTextComplete(true);
 
       // Dibujar la imagen final con animación de rascado programático
       if (afterReveal) {
@@ -262,8 +274,6 @@ export default function ScratchReveal({
       } else {
         setFinalApplied(true);
       }
-    }, 300);
-    timersRef.current.push(t);
   }, [skipped, skipFading, afterReveal, brushSize]);
 
   // ── onTypewriterComplete: tras marketing, esperar y avanzar a fase 3 ────────

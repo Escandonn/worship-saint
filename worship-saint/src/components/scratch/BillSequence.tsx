@@ -322,20 +322,22 @@ export function BillSequence({
         <div style={{
           position: 'absolute',
           bottom: mobileHeader ? '12rem' : '14rem',
-          left: mobileHeader ? '37%' : '50%',
+          left: '50%',
           transform: 'translateX(-50%)',
           zIndex: 31,
           maxWidth: mobileHeader ? '240px' : '360px',
           padding: mobileHeader ? '0.8rem 1.1rem' : '1rem 1.5rem',
-          background: 'rgba(255, 255, 255, 0.96)',
+          background: 'linear-gradient(135deg, rgba(255,255,255,0.98) 0%, rgba(255,248,220,0.98) 50%, rgba(255,255,255,0.98) 100%)',
           borderRadius: '18px',
-          boxShadow: '0 8px 30px rgba(0,0,0,0.35), 0 0 16px rgba(212,175,55,0.2)',
+          boxShadow: '0 8px 30px rgba(0,0,0,0.45), 0 0 20px rgba(212,175,55,0.3), inset 0 1px 0 rgba(255,255,255,0.8)',
+          border: '1px solid rgba(212,175,55,0.3)',
           fontFamily: "'Cinzel', serif",
           fontSize: mobileHeader ? '0.7rem' : '0.82rem',
           fontWeight: 700,
           color: '#3a0808',
           lineHeight: 1.5,
           textAlign: 'center',
+          textShadow: '0 1px 2px rgba(255,255,255,0.8)',
           animation: 'bubblePopIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards, bubbleFloat 3s ease-in-out 0.5s infinite',
           pointerEvents: 'none',
         }}>
@@ -357,7 +359,7 @@ export function BillSequence({
             width: '0', height: '0',
             borderLeft: '10px solid transparent',
             borderRight: '10px solid transparent',
-            borderTop: '12px solid rgba(255, 255, 255, 0.96)',
+            borderTop: '12px solid rgba(255, 248, 220, 0.98)',
           }} />
         </div>
       )}
