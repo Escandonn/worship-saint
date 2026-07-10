@@ -191,7 +191,7 @@ export default function ScratchReveal({
       setPhase(3);
       setTextComplete(true);
 
-      // Dibujar la imagen final inmediatamente en el canvas de fondo
+      // Dibujar la imagen final con animación de rascado programático
       if (afterReveal) {
         const bgCanvas = bgCanvasRef.current;
         const scratchCanvas = scratchCanvasRef.current;
@@ -219,8 +219,42 @@ export default function ScratchReveal({
               // Dibujar paredes laterales con colores post-reveal (rojo/dorado)
               drawSideColumns(bgCtx, rect.width, rect.height, x, x + w, true, performance.now(), null);
 
-              scratchCtx.clearRect(0, 0, scratchCanvas.width, scratchCanvas.height);
-              setFinalApplied(true);
+              // Animación de rascado programático rápida para revelar la imagen
+              const duration = 1200;
+              const start = performance.now();
+              let rafIdLocal = 0;
+
+              const step = () => {
+                const now = performance.now();
+                const elapsed = now - start;
+                const p = Math.min(1, elapsed / duration);
+
+                // Easing brusco: rápido al inicio, termina de golpe
+                const eased = p < 0.3 ? p * 3 : 1;
+                const strokes = Math.floor(8 + eased * 60);
+                for (let i = 0; i < strokes; i++) {
+                  const sx = Math.random() * rect.width;
+                  const sy = Math.random() * rect.height;
+                  const fakeState = {
+                    x: sx,
+                    y: sy,
+                    lastX: sx + (Math.random() - 0.5) * 40,
+                    lastY: sy + (Math.random() - 0.5) * 40,
+                    speed: 120,
+                    isDrawing: true,
+                  } as any;
+                  drawBrush(scratchCtx, fakeState, brushSize);
+                }
+
+                if (p < 1) {
+                  rafIdLocal = requestAnimationFrame(step);
+                } else {
+                  scratchCtx.clearRect(0, 0, scratchCanvas.width, scratchCanvas.height);
+                  setFinalApplied(true);
+                }
+              };
+
+              rafIdLocal = requestAnimationFrame(step);
             };
             newBg.src = afterReveal;
           }
@@ -230,7 +264,7 @@ export default function ScratchReveal({
       }
     }, 300);
     timersRef.current.push(t);
-  }, [skipped, skipFading, afterReveal]);
+  }, [skipped, skipFading, afterReveal, brushSize]);
 
   // ── onTypewriterComplete: tras marketing, esperar y avanzar a fase 3 ────────
   const handleTypewriterComplete = useCallback(() => {
