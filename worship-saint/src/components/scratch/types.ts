@@ -6,11 +6,12 @@ export interface ScratchRevealProps {
   background: string;
   foreground: string;
   midground?: string;
-  afterReveal: string;
+  afterReveal?: string;
   billImage?: string;
   billImage2?: string;
   billCentralImage?: string;
   billCentralImage2?: string;
+  billIzqImage?: string;
   brushSize?: number;
 }
 
@@ -38,6 +39,10 @@ export const TIMING = {
   BILL_CENTRAL_BUBBLE: 2000,// cuándo aparece burbuja de Bill central
   BILL_FRAME_INTERVAL: 400,// alternancia de frames de Bill (ms)
   BILL_CENTRAL_BLINK_INTERVAL: 1500, // intervalo de parpadeo de Bill central (ms)
+  // Bill izquierda (aparece tras leer y desvanecer burbuja de Bill central)
+  BILL_CENTRAL_BUBBLE_FADE: 5000, // cuándo empieza a desvanecerse la burbuja central
+  BILL_IZQ_SHOW: 5800,   // cuándo aparece Bill izq (tras desvanecer burbuja central)
+  BILL_IZQ_BUBBLE: 6500, // cuándo aparece burbuja de Bill izq
   // Scratch
   SCRATCH_TOTAL_DIST: 4500,// distancia total para revelar (px)
   COL_THROTTLE: 33,         // throttle columnas (~30fps)

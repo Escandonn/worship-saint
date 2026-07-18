@@ -22,6 +22,7 @@ export default function ScratchReveal({
   billImage2,
   billCentralImage,
   billCentralImage2,
+  billIzqImage,
   brushSize = 140,
 }: ScratchRevealProps) {
   // ── Refs de canvas (compartidos con canvasRenderer) ────────────────────────
@@ -349,6 +350,7 @@ export default function ScratchReveal({
         billImage2={billImage2}
         billCentralImage={billCentralImage}
         billCentralImage2={billCentralImage2}
+        billIzqImage={billIzqImage}
         mobileHeader={mobileHeader}
         onCinematicComplete={handleCinematicComplete}
       />

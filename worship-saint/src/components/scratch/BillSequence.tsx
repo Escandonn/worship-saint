@@ -10,6 +10,7 @@ interface BillSequenceProps {
   billImage2?: string;
   billCentralImage?: string;
   billCentralImage2?: string;
+  billIzqImage?: string;
   mobileHeader: boolean;
   onCinematicComplete?: () => void;
 }
@@ -20,6 +21,7 @@ export function BillSequence({
   billImage2,
   billCentralImage,
   billCentralImage2,
+  billIzqImage,
   mobileHeader,
   onCinematicComplete,
 }: BillSequenceProps) {
@@ -27,6 +29,10 @@ export function BillSequence({
   const [showBillBubble, setShowBillBubble] = useState(false);
   const [showBillCentral, setShowBillCentral] = useState(false);
   const [showBillCentralBubble, setShowBillCentralBubble] = useState(false);
+  const [showBillIzq, setShowBillIzq] = useState(false);
+  const [showBillIzqBubble, setShowBillIzqBubble] = useState(false);
+  const [billCentralBubbleFading, setBillCentralBubbleFading] = useState(false);
+  const [billCentralFading, setBillCentralFading] = useState(false);
   const [billFrame, setBillFrame] = useState(0);
   const [billCentralFrame, setBillCentralFrame] = useState(0);
   const [billFading, setBillFading] = useState(false);
@@ -169,6 +175,23 @@ export function BillSequence({
     };
   }, [showBillCentral, billCentralImage2]);
 
+  // ── Secuencia Bill izquierda (esquina inferior izquierda) ──────────────────
+  // 1) Dar tiempo para leer la burbuja central
+  // 2) Desvanecer la burbuja central
+  // 3) Aparece Bill izquierda con la misma transición slide-in
+  useEffect(() => {
+    if (!showBillCentralBubble || !billIzqImage) return;
+    const base = TIMING.BILL_CENTRAL_BUBBLE;
+    // Fade-out de la burbuja central
+    const t0 = window.setTimeout(() => setBillCentralBubbleFading(true), TIMING.BILL_CENTRAL_BUBBLE_FADE - base);
+    // Fade-out de la imagen de Bill central (ligeramente antes de que aparezca Bill izq)
+    const t3 = window.setTimeout(() => setBillCentralFading(true), TIMING.BILL_IZQ_SHOW - base - 400);
+    // Bill izquierda aparece tras desvanecerse la burbuja central
+    const t1 = window.setTimeout(() => setShowBillIzq(true), TIMING.BILL_IZQ_SHOW - base);
+    const t2 = window.setTimeout(() => setShowBillIzqBubble(true), TIMING.BILL_IZQ_BUBBLE - base);
+    return () => { window.clearTimeout(t0); window.clearTimeout(t1); window.clearTimeout(t2); window.clearTimeout(t3); };
+  }, [showBillCentralBubble, billIzqImage]);
+
   if (!finalApplied || !billImage) return null;
 
   return (
@@ -179,6 +202,14 @@ export function BillSequence({
           60% { transform: translateY(-6px) scale(1.05); opacity: 1; }
           100% { transform: translateY(0) scale(1); opacity: 1; }
         }
+        @keyframes billFadeOut {
+          0% { opacity: 1; transform: scale(1); }
+          100% { opacity: 0; transform: scale(0.8); }
+        }
+        @keyframes bubbleFadeOut {
+          0% { opacity: 1; transform: translateX(-50%) scale(1); }
+          100% { opacity: 0; transform: translateX(-50%) scale(0.85); }
+        }
         @keyframes bubblePopIn {
           0% { transform: scale(0.3) translateY(10px); opacity: 0; }
           50% { transform: scale(1.08) translateY(-4px); opacity: 1; }
@@ -187,10 +218,6 @@ export function BillSequence({
         @keyframes bubbleFloat {
           0%, 100% { transform: translateY(0); }
           50% { transform: translateY(-4px); }
-        }
-        @keyframes billFadeOut {
-          0% { opacity: 1; transform: translateY(0) scale(1); }
-          100% { opacity: 0; transform: translateY(20px) scale(0.8); }
         }
       `}</style>
 
@@ -275,6 +302,67 @@ export function BillSequence({
         </div>
       )}
 
+      {/* ── Bill izquierda (esquina inferior izquierda) ── */}
+      {showBillIzq && billIzqImage && (
+        <div style={{
+          position: 'absolute',
+          bottom: mobileHeader ? '100px' : '0.5rem',
+          left: mobileHeader ? '20px' : '1rem',
+          zIndex: 30,
+          width: mobileHeader ? '160px' : '240px',
+          height: mobileHeader ? '160px' : '240px',
+          animation: 'billSlideIn 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards',
+          pointerEvents: 'none',
+        }}>
+          <img
+            src={billIzqImage}
+            alt="Bill izquierda"
+            style={{
+              position: 'absolute', inset: 0,
+              width: '100%', height: '100%',
+              objectFit: 'contain',
+              filter: 'drop-shadow(0 6px 20px rgba(0,0,0,0.5))',
+            }}
+          />
+        </div>
+      )}
+
+      {/* ── Burbuja de Bill izquierda ── */}
+      {showBillIzqBubble && (
+        <div style={{
+          position: 'absolute',
+          bottom: mobileHeader ? '11rem' : '13rem',
+          left: mobileHeader ? '1.5rem' : '10rem',
+          zIndex: 31,
+          maxWidth: mobileHeader ? '200px' : '280px',
+          padding: mobileHeader ? '0.7rem 1rem' : '0.9rem 1.3rem',
+          background: 'rgba(255, 255, 255, 0.96)',
+          borderRadius: '18px',
+          boxShadow: '0 8px 30px rgba(0,0,0,0.35), 0 0 16px rgba(212,175,55,0.2)',
+          fontFamily: "'Cinzel', serif",
+          fontSize: mobileHeader ? '0.72rem' : '0.85rem',
+          fontWeight: 700,
+          color: '#3a0808',
+          lineHeight: 1.4,
+          animation: 'bubblePopIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards, bubbleFloat 3s ease-in-out 0.5s infinite',
+          pointerEvents: 'none',
+        }}>
+          <span style={{ color: '#5C0000', fontWeight: 800 }}>listo para obtener</span>
+          <br />
+          <span style={{ color: '#7a1010' }}>nuestros servicios</span>
+          {/* Cola de la nube */}
+          <div style={{
+            position: 'absolute',
+            bottom: '-10px',
+            left: '12px',
+            width: '0', height: '0',
+            borderLeft: '10px solid transparent',
+            borderRight: '10px solid transparent',
+            borderTop: '12px solid rgba(255, 255, 255, 0.96)',
+          }} />
+        </div>
+      )}
+
       {/* ── Bill Central (centro inferior) ── */}
       {showBillCentral && billCentralImage && (
         <div style={{
@@ -285,7 +373,7 @@ export function BillSequence({
           zIndex: 30,
           width:      billCentralConfig.width,
           height:     billCentralConfig.height,
-          animation: 'billSlideIn 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards',
+          animation: `billSlideIn 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards${billCentralFading ? ', billFadeOut 0.8s ease-in forwards' : ''}`,
           pointerEvents: 'none',
         }}>
           <img
@@ -338,7 +426,7 @@ export function BillSequence({
           lineHeight: 1.5,
           textAlign: 'center',
           textShadow: '0 1px 2px rgba(255,255,255,0.8)',
-          animation: 'bubblePopIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards, bubbleFloat 3s ease-in-out 0.5s infinite',
+          animation: `bubblePopIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards, bubbleFloat 3s ease-in-out 0.5s infinite${billCentralBubbleFading ? ', bubbleFadeOut 0.8s ease-in forwards' : ''}`,
           pointerEvents: 'none',
         }}>
           <span style={{ color: '#5C0000', fontWeight: 800 }}>¡Worship es una entidad de estudio</span>
