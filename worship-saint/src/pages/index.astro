@@ -1,5 +1,6 @@
 ---
 import Layout from "../layouts/Layout.astro";
+import NavBar from "../components/NavBar";
 import InicioSection from "../components/sections/inicio/InicioSection.astro";
 import ServiciosSection from "../components/sections/servicios/ServiciosSection.astro";
 import NuestrasObrasSection from "../components/sections/nuestras-obras/NuestrasObrasSection.astro";
@@ -7,6 +8,7 @@ import QuienesSomosSection from "../components/sections/quienes-somos/QuienesSom
 ---
 
 <Layout>
+  <NavBar client:load />
   <main class="page-shell">
     <InicioSection />
     <ServiciosSection />

@@ -15,6 +15,11 @@ body {
     overflow: hidden;
 }
 
+/* Scroll habilitado después de la secuencia cinematográfica */
+body.scroll-enabled {
+    overflow-y: auto;
+}
+
 body {
     background: #000;
 }
@@ -23,6 +28,81 @@ body {
 .page-shell {
     width: 100%;
     min-height: 100vh;
+}
+
+/* ── Navbar fijo ────────────────────────────────────────────────────────── */
+.site-nav {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    background: rgba(26, 5, 5, 0.95);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-bottom: 1px solid rgba(212, 175, 55, 0.3);
+}
+
+/* ── Secciones con fondo rojo→dorado ────────────────────────────────────── */
+.section {
+    position: relative;
+    padding: 6rem 2rem;
+    background: linear-gradient(
+        135deg,
+        #4a0a0a 0%,    /* Rojo oscuro */
+        #6b1515 25%,   /* Rojo medio */
+        #8b2020 50%,   /* Rojo */
+        #a03010 75%,   /* Rojo anaranjado */
+        #b8860b 100%   /* Dorado */
+    );
+    background-size: 200% 200%;
+    animation: gradientShift 8s ease infinite;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+@keyframes gradientShift {
+    0%, 100% {
+        background-position: 0% 50%;
+    }
+    50% {
+        background-position: 100% 50%;
+    }
+}
+
+/* Transición suave entre secciones */
+.section::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(
+        ellipse at 30% 20%,
+        rgba(212, 175, 55, 0.15) 0%,
+        transparent 50%
+    );
+    pointer-events: none;
+}
+
+.section::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(
+        ellipse at 70% 80%,
+        rgba(139, 0, 0, 0.2) 0%,
+        transparent 50%
+    );
+    pointer-events: none;
+}
+
+.section-frame {
+    position: relative;
+    z-index: 1;
+    max-width: 1200px;
+    width: 100%;
+    margin: 0 auto;
 }
 
 /* ── Hero / ScratchReveal ────────────────────────────────────────────────── */

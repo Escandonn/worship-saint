@@ -288,9 +288,11 @@ export default function ScratchReveal({
     timersRef.current.push(fadeT);
   }, [textComplete]);
 
-  // ── onCinematicComplete: Bill central bubble mostrada ──────────────────────
+  // ── onCinematicComplete: secuencia Bill terminée — habilitar scroll ─────────
   const handleCinematicComplete = useCallback(() => {
     setCinematicComplete(true);
+    // Habilitar scroll en el body (el usuario decide cuándo bajar)
+    document.body.classList.add('scroll-enabled');
   }, []);
 
   // ── Render ──────────────────────────────────────────────────────────────────
